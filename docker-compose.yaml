@@ -179,6 +179,41 @@ services:
       - "traefik.http.routers.back-ssl.tls.certresolver=myresolver"
     restart: ${RESTART_POLICY}
 
+
+    map-storage:
+        image: thecodingmachine/nodejs:v2-18-bullseye
+        command: npm run start:dev
+        #command: npm run profile
+        working_dir: /usr/src/app/map-storage
+        environment:
+            #DEBUG: "*"
+            STARTUP_COMMAND_1: ../wait-proto.sh
+            STARTUP_COMMAND_2: ../npm-install.sh
+            NODE_ENV: development
+            PROMETHEUS_AUTHORIZATION_TOKEN: "$PROMETHEUS_AUTHORIZATION_TOKEN"
+            AUTHENTICATION_STRATEGY: "Basic"
+            AUTHENTICATION_USER: "john.doe"
+            AUTHENTICATION_PASSWORD: "password"
+            API_URL: back:50051
+            # Sentry integration
+            SENTRY_DSN: $SENTRY_DSN_MAPSTORAGE
+            SENTRY_ENVIRONMENT: $SENTRY_ENVIRONMENT
+            SENTRY_RELEASE: $SENTRY_RELEASE
+        volumes:
+            - .:/usr/src/app
+        ports:
+            - "9233:9229"
+        labels:
+            - "traefik.enable=true"
+            - "traefik.http.routers.map-storage.rule=Host(`map-storage.workadventure.localhost`)"
+            - "traefik.http.routers.map-storage.entryPoints=web"
+            - "traefik.http.routers.map-storage.service=map-storage"
+            - "traefik.http.services.map-storage.loadbalancer.server.port=3000"
+            - "traefik.http.routers.map-storage-ui.rule=Host(`map-storage.workadventure.localhost`) && PathPrefix(`/ui/`)"
+            - "traefik.http.routers.map-storage-ui.entryPoints=web"
+            - "traefik.http.routers.map-storage-ui.service=map-storage-ui"
+            - "traefik.http.services.map-storage-ui.loadbalancer.server.port=8080"
+
   uploader:
     image: thecodingmachine/workadventure-uploader:${VERSION}
     environment:
@@ -248,21 +283,6 @@ services:
       - "traefik.http.routers.ejabberd-ssl.service=ejabberd"
       - "traefik.http.routers.ejabberd-ssl.tls=true"
       - "traefik.http.routers.ejabberd-ssl.tls.certresolver=myresolver"
-
-  map-storage:
-    image: thecodingmachine/workadventure-map-storage:${VERSION}
-    environment:
-      PROMETHEUS_AUTHORIZATION_TOKEN: "$PROMETHEUS_AUTHORIZATION_TOKEN"
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.map-storage.rule=Host(`${MAP_STORAGE_HOST}`)"
-      - "traefik.http.routers.map-storage.entryPoints=web"
-      - "traefik.http.services.map-storage.loadbalancer.server.port=3000"
-      - "traefik.http.routers.map-storage-ssl.rule=Host(`${MAP_STORAGE_HOST}`)"
-      - "traefik.http.routers.map-storage-ssl.entryPoints=websecure"
-      - "traefik.http.routers.map-storage-ssl.service=map-storage"
-      - "traefik.http.routers.map-storage-ssl.tls=true"
-      - "traefik.http.routers.map-storage-ssl.tls.certresolver=myresolver"
 
 
 #  coturn:
