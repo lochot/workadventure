@@ -3,10 +3,14 @@ import {
     AreaData,
     FocusablePropertyData,
     JitsiRoomPropertyData,
+    ListenerMegaphonePropertyData,
     OpenWebsitePropertyData,
     PlayAudioPropertyData,
+    SpeakerMegaphonePropertyData,
 } from "@workadventure/map-editor";
 import { Jitsi } from "@workadventure/shared-utils";
+import { getSpeakerMegaphoneAreaName } from "@workadventure/map-editor/src/Utils";
+import { slugify } from "@workadventure/shared-utils/src/Jitsi/slugify";
 import { OpenCoWebsite } from "../GameMapPropertiesListener";
 import type { CoWebsite } from "../../../WebRtc/CoWebsite/CoWesbite";
 import { coWebsiteManager } from "../../../WebRtc/CoWebsiteManager";
@@ -17,11 +21,15 @@ import { localUserStore } from "../../../Connexion/LocalUserStore";
 import { ON_ACTION_TRIGGER_BUTTON, ON_ICON_TRIGGER_BUTTON } from "../../../WebRtc/LayoutManager";
 import { LL } from "../../../../i18n/i18n-svelte";
 import { GameScene } from "../GameScene";
-import { inJitsiStore, inOpenWebsite, silentStore } from "../../../Stores/MediaStore";
+import { inJitsiStore, inOpenWebsite, isSpeakerStore, silentStore } from "../../../Stores/MediaStore";
 import { JitsiCoWebsite } from "../../../WebRtc/CoWebsite/JitsiCoWebsite";
 import { JITSI_PRIVATE_MODE, JITSI_URL } from "../../../Enum/EnvironmentVariable";
 import { scriptUtils } from "../../../Api/ScriptUtils";
 import { audioManagerFileStore, audioManagerVisibilityStore } from "../../../Stores/AudioManagerStore";
+import { requestedMegaphoneStore } from "../../../Stores/MegaphoneStore";
+import { gameManager } from "../GameManager";
+import { iframeListener } from "../../../Api/IframeListener";
+import { chatZoneLiveStore } from "../../../Stores/ChatStore";
 
 export class AreasPropertiesListener {
     private scene: GameScene;
@@ -52,7 +60,7 @@ export class AreasPropertiesListener {
                         break;
                     }
                     case "focusable": {
-                        this.handleFocusablePropertysOnEnter(area.x, area.y, area.width, area.height, property);
+                        this.handleFocusablePropertiesOnEnter(area.x, area.y, area.width, area.height, property);
                         break;
                     }
                     case "jitsiRoomProperty": {
@@ -61,6 +69,14 @@ export class AreasPropertiesListener {
                     }
                     case "silent": {
                         this.handleSilentPropertyOnEnter();
+                        break;
+                    }
+                    case "speakerMegaphone": {
+                        this.handleSpeakerMegaphonePropertyOnEnter(property);
+                        break;
+                    }
+                    case "listenerMegaphone": {
+                        this.handleListenerMegaphonePropertyOnEnter(property);
                         break;
                     }
                     default: {
@@ -96,6 +112,14 @@ export class AreasPropertiesListener {
                     }
                     case "silent": {
                         this.handleSilentPropertyOnLeave();
+                        break;
+                    }
+                    case "speakerMegaphone": {
+                        this.handleSpeakerMegaphonePropertyOnLeave(property);
+                        break;
+                    }
+                    case "listenerMegaphone": {
+                        this.handleListenerMegaphonePropertyOnLeave(property);
                         break;
                     }
                     default: {
@@ -183,7 +207,7 @@ export class AreasPropertiesListener {
         }
     }
 
-    private handleFocusablePropertysOnEnter(
+    private handleFocusablePropertiesOnEnter(
         x: number,
         y: number,
         width: number,
@@ -378,5 +402,72 @@ export class AreasPropertiesListener {
         });
 
         layoutManagerActionStore.removeAction(actionId);
+    }
+
+    private handleSpeakerMegaphonePropertyOnEnter(property: SpeakerMegaphonePropertyData): void {
+        if (property.name !== undefined) {
+            this.scene.broadcastService.joinSpace(property.name, false);
+            isSpeakerStore.set(true);
+            requestedMegaphoneStore.set(true);
+            if (property.chatEnabled) {
+                this.handleJoinMucRoom(property.name, "live");
+            }
+        }
+    }
+
+    private handleSpeakerMegaphonePropertyOnLeave(property: SpeakerMegaphonePropertyData): void {
+        if (property.name !== undefined) {
+            this.scene.broadcastService.leaveSpace(property.name);
+            requestedMegaphoneStore.set(false);
+            isSpeakerStore.set(false);
+            if (property.chatEnabled) {
+                this.handleLeaveMucRoom(property.name);
+            }
+        }
+    }
+
+    private handleListenerMegaphonePropertyOnEnter(property: ListenerMegaphonePropertyData): void {
+        if (property.speakerZoneName !== undefined) {
+            const speakerZoneName = getSpeakerMegaphoneAreaName(
+                gameManager.getCurrentGameScene().getGameMap().getGameMapAreas()?.getAreas(),
+                property.speakerZoneName
+            );
+            if (speakerZoneName) {
+                this.scene.broadcastService.joinSpace(speakerZoneName, false);
+                if (property.chatEnabled) {
+                    this.handleJoinMucRoom(speakerZoneName, "live");
+                }
+            }
+        }
+    }
+
+    private handleListenerMegaphonePropertyOnLeave(property: ListenerMegaphonePropertyData): void {
+        if (property.speakerZoneName !== undefined) {
+            const speakerZoneName = getSpeakerMegaphoneAreaName(
+                gameManager.getCurrentGameScene().getGameMap().getGameMapAreas()?.getAreas(),
+                property.speakerZoneName
+            );
+            if (speakerZoneName) {
+                this.scene.broadcastService.leaveSpace(speakerZoneName);
+                if (property.chatEnabled) {
+                    this.handleLeaveMucRoom(speakerZoneName);
+                }
+            }
+        }
+    }
+
+    private handleJoinMucRoom(name: string, type: string) {
+        iframeListener.sendJoinMucEventToChatIframe(
+            `${gameManager.getCurrentGameScene().roomUrl}/${slugify(name)}`,
+            name,
+            type,
+            false
+        );
+        chatZoneLiveStore.set(true);
+    }
+
+    private handleLeaveMucRoom(name: string) {
+        iframeListener.sendLeaveMucEventToChatIframe(`${gameManager.getCurrentGameScene().roomUrl}/${slugify(name)}`);
+        chatZoneLiveStore.set(false);
     }
 }
