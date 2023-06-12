@@ -27,7 +27,6 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - ${DATA_DIR}/letsencrypt/:/letsencrypt/
     restart: ${RESTART_POLICY}
-
   play:
     image: thecodingmachine/workadventure-play:${VERSION}
     build:
@@ -42,6 +41,9 @@ services:
     volumes:
       - ${DATA_DIR}/public/static/:/usr/src/dist/public/static/
       - ${DATA_DIR}/public/resources/:/usr/src/dist/public/resources/
+    ports:
+      - "9231:9229"
+      - "9235:9235"      
     environment:
       - DEBUG_MODE
       - ALLOWED_CORS_ORIGIN=*
