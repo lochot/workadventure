@@ -143,13 +143,13 @@
 
     <div class="content">
         <section class="centered-column tw-w-full tw-m-auto resizing-text">
-            {#if $profileAvailable}
+            <!--{#if $profileAvailable}
                 <iframe
                     title="profile"
                     src={getProfileUrl()}
                     class="tw-w-4/5 tw-h-screen tw-border-0 tw-border-solid tw-border-light-blue"
                 />
-            {/if}
+            {/if}-->
         </section>
     </div>
 </div>
