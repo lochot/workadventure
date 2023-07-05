@@ -4,6 +4,8 @@
     import { LL } from "../../../i18n/i18n-svelte";
     import { mapEditorSelectedAreaPreviewStore } from "../../Stores/MapEditorStore";
     import audioSvg from "../images/audio-white.svg";
+    import { FEATURE_FLAG_BROADCAST_AREAS } from "../../Enum/EnvironmentVariable";
+    import { analyticsClient } from "../../Administration/AnalyticsClient";
     import JitsiRoomPropertyEditor from "./PropertyEditor/JitsiRoomPropertyEditor.svelte";
     import PlayAudioPropertyEditor from "./PropertyEditor/PlayAudioPropertyEditor.svelte";
     import OpenWebsitePropertyEditor from "./PropertyEditor/OpenWebsitePropertyEditor.svelte";
@@ -24,6 +26,7 @@
     let hasListenerMegaphoneProperty: boolean;
     let hasStartProperty: boolean;
     let hasExitProperty: boolean;
+    let hasplayAudioProperty: boolean;
 
     let selectedAreaPreviewUnsubscriber = mapEditorSelectedAreaPreviewStore.subscribe((currentAreaPreview) => {
         if (currentAreaPreview) {
@@ -108,6 +111,7 @@
 
     function onAddProperty(type: AreaDataPropertiesKeys) {
         if ($mapEditorSelectedAreaPreviewStore) {
+            analyticsClient.addMapEditorProperty("area", type || "unknown");
             $mapEditorSelectedAreaPreviewStore.addProperty(getPropertyFromType(type));
             // refresh properties
             properties = $mapEditorSelectedAreaPreviewStore.getProperties();
@@ -117,6 +121,10 @@
 
     function onDeleteProperty(id: string) {
         if ($mapEditorSelectedAreaPreviewStore) {
+            analyticsClient.removeMapEditorProperty(
+                "area",
+                properties.find((property) => property.id === id)?.type || "unknown"
+            );
             $mapEditorSelectedAreaPreviewStore.deleteProperty(id);
             // refresh properties
             properties = $mapEditorSelectedAreaPreviewStore.getProperties();
@@ -148,6 +156,7 @@
         hasListenerMegaphoneProperty = hasProperty("listenerMegaphone");
         hasStartProperty = hasProperty("start");
         hasExitProperty = hasProperty("exit");
+        hasplayAudioProperty = hasProperty("playAudio");
     }
 </script>
 
@@ -160,7 +169,7 @@
                 headerText={$LL.mapEditor.properties.focusableProperties.label()}
                 descriptionText={$LL.mapEditor.properties.focusableProperties.description()}
                 img={"resources/icons/icon_focus.png"}
-                style="z-index: 5;"
+                style="z-index: 9;"
                 on:click={() => {
                     onAddProperty("focusable");
                 }}
@@ -171,7 +180,7 @@
                 headerText={$LL.mapEditor.properties.silentProperty.label()}
                 descriptionText={$LL.mapEditor.properties.silentProperty.description()}
                 img={"resources/icons/icon_silent.png"}
-                style="z-index: 4;"
+                style="z-index: 8;"
                 on:click={() => {
                     onAddProperty("silent");
                 }}
@@ -182,40 +191,42 @@
                 headerText={$LL.mapEditor.properties.jitsiProperties.label()}
                 descriptionText={$LL.mapEditor.properties.jitsiProperties.description()}
                 img={"resources/icons/icon_meeting.png"}
-                style="z-index: 3;"
+                style="z-index: 7;"
                 on:click={() => {
                     onAddProperty("jitsiRoomProperty");
                 }}
             />
         {/if}
-        {#if !hasSpeakerMegaphoneProperty}
-            <AddPropertyButton
-                headerText={$LL.mapEditor.properties.speakerMegaphoneProperties.label()}
-                descriptionText={$LL.mapEditor.properties.speakerMegaphoneProperties.description()}
-                img={"resources/icons/icon_speaker.png"}
-                style="z-index: 3;"
-                on:click={() => {
-                    onAddProperty("speakerMegaphone");
-                }}
-            />
-        {/if}
-        {#if !hasListenerMegaphoneProperty}
-            <AddPropertyButton
-                headerText={$LL.mapEditor.properties.listenerMegaphoneProperties.label()}
-                descriptionText={$LL.mapEditor.properties.listenerMegaphoneProperties.description()}
-                img={"resources/icons/icon_listener.png"}
-                style="z-index: 3;"
-                on:click={() => {
-                    onAddProperty("listenerMegaphone");
-                }}
-            />
+        {#if FEATURE_FLAG_BROADCAST_AREAS}
+            {#if !hasSpeakerMegaphoneProperty}
+                <AddPropertyButton
+                    headerText={$LL.mapEditor.properties.speakerMegaphoneProperties.label()}
+                    descriptionText={$LL.mapEditor.properties.speakerMegaphoneProperties.description()}
+                    img={"resources/icons/icon_speaker.png"}
+                    style="z-index: 6;"
+                    on:click={() => {
+                        onAddProperty("speakerMegaphone");
+                    }}
+                />
+            {/if}
+            {#if !hasListenerMegaphoneProperty}
+                <AddPropertyButton
+                    headerText={$LL.mapEditor.properties.listenerMegaphoneProperties.label()}
+                    descriptionText={$LL.mapEditor.properties.listenerMegaphoneProperties.description()}
+                    img={"resources/icons/icon_listener.png"}
+                    style="z-index: 5;"
+                    on:click={() => {
+                        onAddProperty("listenerMegaphone");
+                    }}
+                />
+            {/if}
         {/if}
         {#if !hasStartProperty}
             <AddPropertyButton
                 headerText={$LL.mapEditor.properties.startProperties.label()}
                 descriptionText={$LL.mapEditor.properties.startProperties.description()}
                 img={"resources/icons/icon_start.png"}
-                style="z-index: 3;"
+                style="z-index: 4;"
                 on:click={() => {
                     onAddProperty("start");
                 }}
@@ -232,15 +243,17 @@
                 }}
             />
         {/if}
-        <AddPropertyButton
-            headerText={$LL.mapEditor.properties.audioProperties.label()}
-            descriptionText={$LL.mapEditor.properties.audioProperties.description()}
-            img={audioSvg}
-            style="z-index: 2;"
-            on:click={() => {
-                onAddProperty("playAudio");
-            }}
-        />
+        {#if !hasplayAudioProperty}
+            <AddPropertyButton
+                headerText={$LL.mapEditor.properties.audioProperties.label()}
+                descriptionText={$LL.mapEditor.properties.audioProperties.description()}
+                img={audioSvg}
+                style="z-index: 2;"
+                on:click={() => {
+                    onAddProperty("playAudio");
+                }}
+            />
+        {/if}
         <AddPropertyButton
             headerText={$LL.mapEditor.properties.linkProperties.label()}
             descriptionText={$LL.mapEditor.properties.linkProperties.description()}
@@ -283,7 +296,7 @@
                     />
                 {:else if property.type === "playAudio"}
                     <PlayAudioPropertyEditor
-                        {property}
+                        property={{ ...property, hideButtonLabel: true }}
                         on:close={() => {
                             onDeleteProperty(property.id);
                         }}
