@@ -3,7 +3,7 @@ import type { Translation } from "../i18n-types";
 
 const woka: DeepPartial<Translation["woka"]> = {
     customWoka: {
-        title: "Personalice su WOKA",
+        title: "Personalice su Avatar",
         navigation: {
             return: "Volver",
             back: "Atrás",
@@ -12,9 +12,9 @@ const woka: DeepPartial<Translation["woka"]> = {
         },
     },
     selectWoka: {
-        title: "Seleccionar su WOKA",
+        title: "Seleccionar su Avatar",
         continue: "Continuar",
-        customize: "Personalizar su WOKA",
+        customize: "Personalizar su Avatar",
     },
     menu: {
         businessCard: "Tarjeta de visita",
