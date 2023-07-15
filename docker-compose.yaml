@@ -105,7 +105,6 @@ services:
       - "traefik.http.routers.play-ssl.service=play"
       - "traefik.http.routers.play-ssl.tls=true"
       - "traefik.http.routers.play-ssl.tls.certresolver=myresolver"
-
       - "traefik.http.routers.room-api.rule=Host(`${ROOM_API_HOST}`)"
       - "traefik.http.routers.room-api.entryPoints=grpc"
       - "traefik.http.routers.room-api.service=room-api"
