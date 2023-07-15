@@ -51,8 +51,8 @@ export const warningContainerStore = createWarningContainerStore();
 export enum SubMenusInterface {
     settings = "settings",
     profile = "profile",
-    invite = "invite",
-    aboutRoom = "credit",
+    //invite = "invite",
+    //aboutRoom = "credit",
     globalMessages = "globalMessages",
     contact = "contact",
     report = "report",
@@ -75,10 +75,10 @@ interface ScriptingMenu {
 
 export type MenuItem = TranslatedMenu | ScriptingMenu;
 
-export const inviteMenu: MenuItem = {
+/*export const inviteMenu: MenuItem = {
     type: "translated",
     key: SubMenusInterface.invite,
-};
+};*/
 
 export const inviteUserActivated = writable(true);
 export const mapEditorActivated = writable(false);
@@ -93,11 +93,11 @@ function createSubMenusStore() {
             type: "translated",
             key: SubMenusInterface.settings,
         },
-        {
+        /*{
             type: "translated",
             key: SubMenusInterface.aboutRoom,
         },
-        inviteMenu,
+        inviteMenu,*/
         {
             type: "translated",
             key: SubMenusInterface.globalMessages,
@@ -108,7 +108,7 @@ function createSubMenusStore() {
         },
     ]);
 
-    inviteUserActivated.subscribe((value) => {
+    /*inviteUserActivated.subscribe((value) => {
         //update menu tab
         update((valuesSubMenusStore) => {
             const indexInviteMenu = valuesSubMenusStore.findIndex(
@@ -121,7 +121,7 @@ function createSubMenusStore() {
             }
             return valuesSubMenusStore;
         });
-    });
+    });*/
 
     return {
         subscribe,
