@@ -25,7 +25,6 @@ class OpenIDClient {
 
     private initClient(): Promise<Client> {
         if (!this.issuerPromise) {
-            console.log("OIDC STARTING DISCOVERY!");
             this.issuerPromise = Issuer.discover(OPID_CLIENT_ISSUER)
                 .then((issuer) => {
                     return new issuer.Client({
@@ -37,7 +36,7 @@ class OpenIDClient {
                 })
                 .catch((e) => {
                     // If this fails, let's try with only the openid-configuration configuration.
-                    console.log(
+                    console.info(
                         "Failed to fetch OIDC configuration for both .well-known/openid-configuration and oauth-authorization-server. Trying .well-known/openid-configuration only."
                     );
                     this.issuerPromise = Issuer.discover(OPID_CLIENT_ISSUER + "/.well-known/openid-configuration")
@@ -59,7 +58,12 @@ class OpenIDClient {
         return this.issuerPromise;
     }
 
-    public authorizationUrl(res: Response, redirect: string | undefined, playUri: string): Promise<string> {
+    public authorizationUrl(
+        res: Response,
+        redirect: string | undefined,
+        playUri: string,
+        req: Request
+    ): Promise<string> {
         return this.initClient().then((client) => {
             if (!OPID_SCOPE.includes("email") || !OPID_SCOPE.includes("openid")) {
                 throw new Error("Invalid scope, 'email' and 'openid' are required in OPID_SCOPE.");
@@ -69,14 +73,16 @@ class OpenIDClient {
             // store the code_verifier in your framework's session mechanism, if it is a cookie based solution
             // it should be httpOnly (not readable by javascript) and encrypted.
             res.cookie("code_verifier", this.encrypt(code_verifier), undefined, {
-                httpOnly: true,
+                httpOnly: true, // dont let browser javascript access cookie ever
+                secure: req.secure, // only use cookie over https
             });
 
             // We also store the state in cookies. The state should not be needed, except for older OpenID client servers that
             // don't understand PKCE
             const state = v4();
             res.cookie("oidc_state", state, undefined, {
-                httpOnly: true,
+                httpOnly: true, // dont let browser javascript access cookie ever
+                secure: req.secure, // only use cookie over https
             });
 
             const code_challenge = generators.codeChallenge(code_verifier);

@@ -102,6 +102,15 @@
                                         roomName: connectionManager.currentRoom?.roomName ?? "default",
                                         visitCardUrl: gameManager.myVisitCardUrl,
                                         userRoomToken: gameManager.getCurrentGameScene().connection?.userRoomToken,
+                                        klaxoonToolActivated: connectionManager.currentRoom?.klaxoonToolActivated,
+                                        youtubeToolActivated: connectionManager.currentRoom?.youtubeToolActivated,
+                                        googleDocsToolActivated: connectionManager.currentRoom?.googleDocsToolActivated,
+                                        googleSheetsToolActivated:
+                                            connectionManager.currentRoom?.googleSheetsToolActivated,
+                                        googleSlidesToolActivated:
+                                            connectionManager.currentRoom?.googleSlidesToolActivated,
+                                        klaxoonToolClientId: connectionManager.currentRoom?.klaxoonToolClientId,
+                                        eraserToolActivated: connectionManager.currentRoom?.eraserToolActivated,
                                     },
                                 },
                                 "*"

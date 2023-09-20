@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { KLAXOON_ACTIVITY_PICKER_EVENT, isKlaxoonEvent } from "@workadventure/shared-utils";
 import { isChatEvent, isChatMessage } from "./ChatEvent";
 import { isClosePopupEvent } from "./ClosePopupEvent";
 import { isGoToPageEvent } from "./GoToPageEvent";
@@ -18,7 +19,7 @@ import { isSetVariableEvent } from "./SetVariableEvent";
 import { isCreateEmbeddedWebsiteEvent, isEmbeddedWebsiteEvent } from "./EmbeddedWebsiteEvent";
 import { isLoadTilesetEvent } from "./LoadTilesetEvent";
 import { isMessageReferenceEvent, isTriggerActionMessageEvent } from "./Ui/TriggerActionMessageEvent";
-import { isMenuRegisterEvent, isUnregisterMenuEvent } from "./Ui/MenuRegisterEvent";
+import { isMenuRegisterEvent, isOpenMenuEvent, isUnregisterMenuEvent } from "./Ui/MenuEvents";
 import { isPlayerPosition } from "./PlayerPosition";
 import { isCameraSetEvent } from "./CameraSetEvent";
 import { isCameraFollowPlayerEvent } from "./CameraFollowPlayerEvent";
@@ -215,6 +216,10 @@ export const isIframeEventWrapper = z.union([
         data: isUnregisterMenuEvent,
     }),
     z.object({
+        type: z.literal("openMenu"),
+        data: isOpenMenuEvent,
+    }),
+    z.object({
         type: z.literal("setTiles"),
         data: isSetTilesEvent,
     }),
@@ -289,6 +294,10 @@ export const isIframeEventWrapper = z.union([
     z.object({
         type: z.literal("closeBanner"),
         data: z.undefined(),
+    }),
+    z.object({
+        type: z.literal(KLAXOON_ACTIVITY_PICKER_EVENT),
+        payload: isKlaxoonEvent,
     }),
 ]);
 
@@ -447,6 +456,7 @@ export type IframeResponseEvent = z.infer<typeof isIframeResponseEvent>;
 export const isLookingLikeIframeEventWrapper = z.object({
     type: z.string(),
     data: z.unknown().optional(),
+    payload: z.unknown().optional(),
 });
 
 /**
@@ -487,6 +497,10 @@ export const iframeQueryMapTypeGuards = {
         answer: z.undefined(),
     },
     closeCoWebsites: {
+        query: z.undefined(),
+        answer: z.undefined(),
+    },
+    goToLogin: {
         query: z.undefined(),
         answer: z.undefined(),
     },

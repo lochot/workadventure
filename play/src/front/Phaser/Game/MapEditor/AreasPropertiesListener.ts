@@ -148,7 +148,7 @@ export class AreasPropertiesListener {
     private handleOpenWebsitePropertyOnEnter(property: OpenWebsitePropertyData): void {
         const actionId = "openWebsite-" + (Math.random() + 1).toString(36).substring(7);
 
-        if (property.newTab) {
+        if (property.newTab && property.link != undefined) {
             const forceTrigger = localUserStore.getForceCowebsiteTrigger();
             if (forceTrigger || property.trigger === ON_ACTION_TRIGGER_BUTTON) {
                 this.coWebsitesActionTriggers.set(property.id, actionId);
@@ -160,7 +160,7 @@ export class AreasPropertiesListener {
                     uuid: actionId,
                     type: "message",
                     message: message,
-                    callback: () => scriptUtils.openTab(property.link),
+                    callback: () => scriptUtils.openTab(property.link as string),
                     userInputManager: this.scene.userInputManager,
                 });
             } else {
@@ -246,7 +246,7 @@ export class AreasPropertiesListener {
             let jwt: string | undefined;
             if (JITSI_PRIVATE_MODE && !jitsiUrl) {
                 if (!this.scene.connection) {
-                    console.log("Cannot connect to Jitsi. No connection to Pusher server.");
+                    console.info("Cannot connect to Jitsi. No connection to Pusher server.");
                     return;
                 }
                 const answer = await this.scene.connection.queryJitsiJwtToken(roomName);
@@ -275,10 +275,27 @@ export class AreasPropertiesListener {
 
             const closable = property.closable;
 
-            const coWebsite = new JitsiCoWebsite(new URL(domain), false, undefined, undefined, closable);
+            const coWebsite = new JitsiCoWebsite(
+                new URL(domain),
+                false,
+                undefined,
+                undefined,
+                closable,
+                roomName,
+                gameManager.getPlayerName() ?? "unknown",
+                jwt,
+                property.jitsiRoomConfig,
+                undefined,
+                domainWithoutProtocol
+            );
 
             coWebsiteManager.addCoWebsiteToStore(coWebsite, 0);
-            this.scene.initialiseJitsi(coWebsite, roomName, jwt, domainWithoutProtocol);
+
+            coWebsiteManager.loadCoWebsite(coWebsite).catch((err) => {
+                console.error(err);
+            });
+
+            analyticsClient.enteredJitsi(roomName, this.scene.roomUrl);
 
             layoutManagerActionStore.removeAction("jitsi");
         };
@@ -309,7 +326,7 @@ export class AreasPropertiesListener {
     }
 
     private handleOpenWebsitePropertiesOnLeave(property: OpenWebsitePropertyData): void {
-        const openWebsiteProperty: string | undefined = property.link;
+        const openWebsiteProperty: string | null = property.link;
         const websiteTriggerProperty: string | undefined = property.trigger;
 
         if (!openWebsiteProperty) {
@@ -402,7 +419,7 @@ export class AreasPropertiesListener {
         inOpenWebsite.set(true);
 
         // analytics event for open website
-        analyticsClient.openedWebsite();
+        analyticsClient.openedWebsite(coWebsite.getUrl());
     }
 
     private loadCoWebsiteFunction(coWebsite: CoWebsite, actionId: string): void {

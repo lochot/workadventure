@@ -1,10 +1,12 @@
 import { Subject } from "rxjs";
 import { availabilityStatusToJSON, XmppSettingsMessage } from "@workadventure/messages";
+import { KLAXOON_ACTIVITY_PICKER_EVENT } from "@workadventure/shared-utils";
 import { HtmlUtils } from "../WebRtc/HtmlUtils";
 import {
     additionnalButtonsMenu,
     handleMenuRegistrationEvent,
     handleMenuUnregisterEvent,
+    handleOpenMenuEvent,
     warningContainerStore,
 } from "../Stores/MenuStore";
 import type { PlayerInterface } from "../Phaser/Game/PlayerInterface";
@@ -224,6 +226,11 @@ class IframeListener {
                 let foundSrc: string | undefined;
 
                 let iframe: HTMLIFrameElement | undefined;
+
+                // if the message source is Klaxoon, we set the src to the content window of the iframe
+                if (message.origin === "https://app.klaxoon.com") {
+                    foundSrc = message.origin;
+                }
                 for (iframe of this.iframes.keys()) {
                     if (iframe.contentWindow === message.source) {
                         foundSrc = iframe.src;
@@ -411,11 +418,14 @@ class IframeListener {
                         handleMenuRegistrationEvent(
                             iframeEvent.data.name,
                             iframeEvent.data.iframe,
+                            iframeEvent.data.key,
                             foundSrc,
                             iframeEvent.data.options
                         );
                     } else if (iframeEvent.type == "unregisterMenu") {
-                        handleMenuUnregisterEvent(iframeEvent.data.name);
+                        handleMenuUnregisterEvent(iframeEvent.data.key);
+                    } else if (iframeEvent.type == "openMenu") {
+                        handleOpenMenuEvent(iframeEvent.data.key);
                     } else if (iframeEvent.type == "askPosition") {
                         this._askPositionStream.next(iframeEvent.data);
                     } else if (iframeEvent.type == "openInviteMenu") {
@@ -467,6 +477,11 @@ class IframeListener {
                     } else if (iframeEvent.type == "closeBanner") {
                         warningContainerStore.set(false);
                         bannerStore.set(null);
+                    } else if (iframeEvent.type == KLAXOON_ACTIVITY_PICKER_EVENT) {
+                        // dispacth event on windows
+                        // @ts-ignore
+                        const event = new MessageEvent("AcitivityPickerFromWorkAdventure", message);
+                        window.dispatchEvent(event);
                     } else {
                         // Keep the line below. It will throw an error if we forget to handle one of the possible values.
                         const _exhaustiveCheck: never = iframeEvent;

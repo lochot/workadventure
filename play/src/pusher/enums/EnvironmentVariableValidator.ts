@@ -104,6 +104,23 @@ export const EnvironmentVariables = z.object({
     JITSI_XMPP_DOMAIN: z.string().optional(),
     JITSI_MUC_DOMAIN: z.string().optional(),
     MAP_STORAGE_PATH_PREFIX: z.string().optional(),
+    KLAXOON_ENABLED: BoolAsString.optional().transform((val) => toBool(val, false)),
+    KLAXOON_CLIENT_ID: z.string().optional(),
+    YOUTUBE_ENABLED: BoolAsString.optional().transform((val) => toBool(val, false)),
+    GOOGLE_DOCS_ENABLED: BoolAsString.optional().transform((val) => toBool(val, false)),
+    GOOGLE_SHEETS_ENABLED: BoolAsString.optional().transform((val) => toBool(val, false)),
+    GOOGLE_SLIDES_ENABLED: BoolAsString.optional().transform((val) => toBool(val, false)),
+    ERASER_ENABLED: BoolAsString.optional().transform((val) => toBool(val, false)),
+    WHITE_LISTE_EMBEDAABLE_DOMAINS: z
+        .string()
+        .optional()
+        .transform((val) => toArray(val)),
+
+    // Limit bandwidth environment variables
+    PEER_VIDEO_LOW_BANDWIDTH: PositiveIntAsString.optional(),
+    PEER_VIDEO_RECOMMENDED_BANDWIDTH: PositiveIntAsString.optional(),
+    PEER_SCREEN_SHARE_LOW_BANDWIDTH: PositiveIntAsString.optional(),
+    PEER_SCREEN_SHARE_RECOMMENDED_BANDWIDTH: PositiveIntAsString.optional(),
 });
 
 export type EnvironmentVariables = z.infer<typeof EnvironmentVariables>;

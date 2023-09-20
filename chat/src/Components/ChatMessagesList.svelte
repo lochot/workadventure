@@ -219,7 +219,7 @@
     </div>
 
     <div
-        class="wa-messages-list tw-flex tw-flex-col tw-flex-auto tw-px-5 tw-overflow-y-scroll tw-justify-end tw-overflow-y-scroll tw-h-auto tw-min-h-screen"
+        class="wa-messages-list tw-flex tw-flex-col tw-flex-auto tw-px-5 tw-overflow-x-hidden tw-overflow-y-scroll tw-justify-end tw-h-auto tw-min-h-screen"
     >
         <div class="tw-mb-auto load-history">
             {#if $canLoadOlderMessagesStore}
@@ -240,7 +240,7 @@
             {:else if $showDisabledLoadOlderMessagesStore && $me && $me.isAdmin}
                 {#if ADMIN_API_URL}
                     <button
-                        class="tw-text-orange tw-font-bold tw-underline tw-m-auto tw-text-xs tw-cursor-pointer"
+                        class="tw-text-warning tw-font-bold tw-underline tw-m-auto tw-text-xs tw-cursor-pointer"
                         on:click={() => iframeListener.sendRedirectPricing()}
                     >
                         <img alt="Crown icon" src={crown} class="tw-mr-1" />
@@ -309,7 +309,7 @@
             </div>
         {/each}
         {#if $unreads > 0}
-            <div class="tw-w-full tw-fixed tw-left-0 tw-bottom-14 tw-animate-bounce tw-cursor-pointer">
+            <div class="tw-w-full tw-fixed tw-left-0 tw-bottom-28 tw-animate-bounce tw-cursor-pointer">
                 <div
                     in:fly={{ y: 10, duration: 200 }}
                     style="margin: auto"
