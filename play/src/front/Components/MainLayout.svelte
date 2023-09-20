@@ -5,6 +5,7 @@
     import { emoteDataStoreLoading, emoteMenuStore } from "../Stores/EmoteStore";
     import { requestVisitCardsStore } from "../Stores/GameStore";
     import { helpCameraSettingsVisibleStore, helpWebRtcSettingsVisibleStore } from "../Stores/HelpSettingsStore";
+    import { helpSettingsPopupBlockedStore } from "../Stores/HelpSettingsPopupBlockedStore";
     import { layoutManagerActionVisibilityStore } from "../Stores/LayoutManagerStore";
     import { menuVisiblilityStore, warningContainerStore } from "../Stores/MenuStore";
     import { showReportScreenStore, userReportEmpty } from "../Stores/ShowReportScreenStore";
@@ -40,6 +41,7 @@
     import Lazy from "./Lazy.svelte";
     import UiWebsiteContainer from "./UI/Website/UIWebsiteContainer.svelte";
     import Modal from "./Modal/Modal.svelte";
+    import HelpPopUpBlocked from "./HelpSettings/HelpPopUpBlocked.svelte";
 
     let mainLayout: HTMLDivElement;
 
@@ -99,16 +101,16 @@
             <HelpWebRtcSettingsPopup />
         {/if}
 
+        {#if $helpSettingsPopupBlockedStore}
+            <HelpPopUpBlocked />
+        {/if}
+
         {#if $audioManagerVisibilityStore}
             <AudioManager />
         {/if}
 
         {#if $showLimitRoomModalStore}
             <LimitRoomModal />
-        {/if}
-
-        {#if $actionsMenuStore}
-            <ActionsMenu />
         {/if}
 
         {#if $followStateStore !== "off" || $peerStore.size > 0}
@@ -134,6 +136,10 @@
 
     {#if $layoutManagerActionVisibilityStore}
         <LayoutActionManager />
+    {/if}
+
+    {#if $actionsMenuStore}
+        <ActionsMenu />
     {/if}
 
     <ActionBar />

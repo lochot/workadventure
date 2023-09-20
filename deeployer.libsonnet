@@ -112,9 +112,21 @@
           "LOGROCKET_ID": env.LOGROCKET_ID,
           "ROOM_API_PORT": "50051",
           "DEBUG": "*",
+          "PEER_VIDEO_LOW_BANDWIDTH": "150",
+          "PEER_VIDEO_RECOMMENDED_BANDWIDTH": "600",
+          "PEER_SCREEN_SHARE_LOW_BANDWIDTH": "250",
+          "PEER_SCREEN_SHARE_RECOMMENDED_BANDWIDTH":"1000",
           "JITSI_DOMAIN": "coremeet.workadventu.re",
           "JITSI_XMPP_DOMAIN": "prosody.workadventu.re",
           "JITSI_MUC_DOMAIN": "muc.prosody.workadventu.re",
+          # Integration tools
+          "KLAXOON_ENABLED": "true",
+          "KLAXOON_CLIENT_ID": env.KLAXOON_CLIENT_ID,
+          "YOUTUBE_ENABLED": "true",
+          "GOOGLE_DOCS_ENABLED": "true",
+          "GOOGLE_SHEETS_ENABLED": "true",
+          "GOOGLE_SLIDES_ENABLED": "true",
+          "ERASER_ENABLED": "true",
         } + (if adminUrl != null then {
           # Admin
           "ADMIN_URL": adminUrl,
@@ -211,7 +223,7 @@
       "ports": [6379]
     },
     "iconserver": {
-      "image": "matthiasluedtke/iconserver:v3.13.0",
+      "image": "matthiasluedtke/iconserver:v3.15.0",
       "host": {
         "url": "icon-"+url,
         "containerPort": 8080,

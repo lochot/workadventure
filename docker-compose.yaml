@@ -1,140 +1,185 @@
 version: "3.6"
 services:
-  reverse-proxy:
-    image: traefik:v2.8
-    command:
-      - --log.level=${LOG_LEVEL}
-      - --providers.docker
-      - --providers.docker.exposedbydefault=false
-      # Entry points
-      - --entryPoints.web.address=:${HTTP_PORT}
-      - --entrypoints.web.http.redirections.entryPoint.to=websecure
-      - --entrypoints.web.http.redirections.entryPoint.scheme=https
-      - --entryPoints.websecure.address=:${HTTPS_PORT}
-      - --entryPoints.grpc.address=:50051
-      # HTTP challenge
-      - --certificatesresolvers.myresolver.acme.email=${ACME_EMAIL}
-      - --certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json
-      - --certificatesresolvers.myresolver.acme.httpchallenge.entrypoint=web
-      # Let's Encrypt's staging server
-      # uncomment during testing to avoid rate limiting
-      #- --certificatesresolvers.dnsresolver.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory
-    ports:
-      - "${HTTP_PORT}:80"
-      - "${HTTPS_PORT}:443"
-      - "${GRPC_PORT}:50051"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ${DATA_DIR}/letsencrypt/:/letsencrypt/
-    restart: ${RESTART_POLICY}
-  play:
-    image: thecodingmachine/workadventure-play:${VERSION}
-    build:
-      context: ./
-      dockerfile: play/Dockerfile
-      cache_from:
-        - thecodingmachine/workadventure-play:${DOCKER_TAG:-develop}
-      args:
-        BUILDKIT_INLINE_CACHE: 1
-    working_dir: /usr/src/play
-    command: yarn run start
-    volumes:
-      - ${DATA_DIR}/public/static/:/usr/src/dist/public/static/
-      - ${DATA_DIR}/public/resources/:/usr/src/dist/public/resources/
-    ports:
-      - "9231:9229"
-      - "9235:9235"      
-    environment:
-      - DEBUG_MODE
-      - ALLOWED_CORS_ORIGIN=*
-      - JITSI_URL
-      - JITSI_PRIVATE_MODE
-      - ENABLE_FEATURE_MAP_EDITOR
-      - PUSHER_URL=https://${PUSHER_HOST}
-      - ICON_URL=https://${ICON_HOST}
-      - TURN_SERVER
-      - TURN_USER
-      - TURN_PASSWORD
-      - TURN_STATIC_AUTH_SECRET
-      - STUN_SERVER
-      - SKIP_RENDER_OPTIMIZATIONS
-      - MAX_PER_GROUP
-      - MAX_USERNAME_LENGTH
-#      - DISABLE_ANONYMOUS
-      - DISABLE_NOTIFICATIONS
-      - SECRET_KEY
-      - API_URL
-      - ADMIN_API_TOKEN
-      - ADMIN_API_URL
-      - FRONT_URL=https://${FRONT_HOST}
-      - PLAY_URL=https://${FRONT_HOST}
-      - CHAT_URL=https://${CHAT_HOST}
-      - PUBLIC_MAP_STORAGE_URL=https://${MAP_STORAGE_HOST}
-      - START_ROOM_URL
-      - OPID_PROMPT=${OPID_PROMPT}
-      - OPID_CLIENT_ID=${OPID_CLIENT_ID}
-      - OPID_CLIENT_SECRET=${OPID_CLIENT_SECRET}
-      - OPID_CLIENT_ISSUER=${OPID_CLIENT_ISSUER}
-      - OPID_CLIENT_REDIRECT_URL= ${OPID_CLIENT_REDIRECT_URL}
-      - OPID_PROFILE_SCREEN_PROVIDER=${OPID_PROFILE_SCREEN_PROVIDER}
-      - DISABLE_ANONYMOUS=${DISABLE_ANONYMOUS}
-      - OPID_USERNAME_CLAIM=${OPID_USERNAME_CLAIM}
-      - OPID_WOKA_NAME_POLICY
-      - ENABLE_CHAT
-      - ENABLE_CHAT_UPLOAD
-      - ENABLE_CHAT_ONLINE_LIST
-      - ENABLE_CHAT_DISCONNECTED_LIST
-      - UPLOADER_URL=https://${UPLOADER_HOST}
-      # Only used if you set up a JWT authentication mechanism in Ejabberd
-      - EJABBERD_JWT_SECRET=${EJABBERD_JWT_SECRET}
-      - EJABBERD_DOMAIN=${EJABBERD_DOMAIN}
-      - ENABLE_REPORT_ISSUES_MENU=${ENABLE_REPORT_ISSUES_MENU}
-      - REPORT_ISSUES_URL=${REPORT_ISSUES_URL}
-      # LogRocket
-      - LOGROCKET_ID=${LOGROCKET_ID}
-      # Room API
-      - ROOM_API_PORT=50051
-      - ROOM_API_SECRET_KEY=${ROOM_API_SECRET_KEY}
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.play.rule=Host(`${FRONT_HOST}`)"
-      - "traefik.http.routers.play.entryPoints=web"
-      - "traefik.http.services.play.loadbalancer.server.port=3000"
-      - "traefik.http.routers.play-ssl.rule=Host(`${FRONT_HOST}`)"
-      - "traefik.http.routers.play-ssl.entryPoints=websecure"
-      - "traefik.http.routers.play-ssl.service=play"
-      - "traefik.http.routers.play-ssl.tls=true"
-      - "traefik.http.routers.play-ssl.tls.certresolver=myresolver"
-      - "traefik.http.routers.room-api.rule=Host(`${ROOM_API_HOST}`)"
-      - "traefik.http.routers.room-api.entryPoints=grpc"
-      - "traefik.http.routers.room-api.service=room-api"
-      - "traefik.http.services.room-api.loadbalancer.server.port=50051"
-      - "traefik.http.services.room-api.loadbalancer.server.scheme=h2c"
-      - "traefik.http.routers.room-api.tls=true"
-      - "traefik.http.routers.room-api.tls.certresolver=myresolver"
-    restart: ${RESTART_POLICY}
+    reverse-proxy:
+        image: traefik:v2.8
+        expose:
+            - "8080"
+        ports:
+            - "80:80"
+        command:
+            - --api.insecure=true
+            - --providers.docker
+            - --entryPoints.web.address=:80
+            - --providers.docker.exposedbydefault=false
+            #- --log.level=DEBUG
+        labels:
+            - "traefik.enable=true"
+            - "traefik.port=8080"
+            - "traefik.http.routers.traefik.rule=Host(`traefik.workadventure.localhost`)"
+            - "traefik.http.routers.traefik.service=api@internal"
+        depends_on:
+            - back
+            - play
+        volumes:
+            - /var/run/docker.sock:/var/run/docker.sock
+        networks:
+            default:
+                aliases:
+                    - 'front.workadventure.localhost'
+                    - 'play.workadventure.localhost'
+                    - 'room-api.workadventure.localhost'
+                    - 'maps.workadventure.localhost'
+                    - 'oidc.workadventure.localhost'
+                    - 'map-storage.workadventure.localhost'
+                    - 'xmpp.workadventure.localhost'
 
-  chat:
-    image: thecodingmachine/workadventure-chat:${VERSION}
-    environment:
-      - PUSHER_URL=https://${PUSHER_HOST}
-      - UPLOADER_URL=https://${UPLOADER_HOST}
-      - EMBEDLY_KEY=${EMBEDLY_KEY}
-      - ENABLE_CHAT_UPLOAD=${ENABLE_CHAT_UPLOAD}
-      - EJABBERD_DOMAIN=${EJABBERD_DOMAIN}
-      - EJABBERD_WS_URI=${EJABBERD_WS_URI}
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.chat.rule=Host(`${CHAT_HOST}`)"
-      - "traefik.http.routers.chat.entryPoints=web"
-      - "traefik.http.services.chat.loadbalancer.server.port=80"
-      - "traefik.http.routers.chat-ssl.rule=Host(`${CHAT_HOST}`)"
-      - "traefik.http.routers.chat-ssl.entryPoints=websecure"
-      - "traefik.http.routers.chat-ssl.service=chat"
-      - "traefik.http.routers.chat-ssl.tls=true"
-      - "traefik.http.routers.chat-ssl.tls.certresolver=myresolver"
-    restart: ${RESTART_POLICY}
+    play:
+        image: thecodingmachine/nodejs:v2-18-bullseye
+        command: npm run dev
+        working_dir: /usr/src/app/play
+        volumes:
+            - .:/usr/src/app
+        ports:
+            - "9231:9229"
+            - "9235:9235"
+        environment:
+            # On startup, we ask the messages container to regenerate the files.
+            # Note: we need to use this "messages" container because of ARM64 processors that are not supported with protoc (used in "messages" container)
+            STARTUP_COMMAND_1: ../wait-proto.sh
+            STARTUP_COMMAND_2: ../npm-install.sh
+            STARTUP_COMMAND_3: npm run typesafe-i18n
+            DEBUG: "socket,space"
+            DEBUG_COLORS: "true"
+            DEBUG_ERROR_MESSAGES: "true"
+            DEBUG_MODE: "$DEBUG_MODE"
+            JITSI_URL: $JITSI_URL
+            JITSI_PRIVATE_MODE: "$JITSI_PRIVATE_MODE"
+            ENABLE_MAP_EDITOR: "$ENABLE_MAP_EDITOR"
+            HOST: "0.0.0.0"
+            NODE_ENV: development
+            ALLOWED_CORS_ORIGIN: "http://play.workadventure.localhost"
+            VITE_URL: "http://front.workadventure.localhost"
+            PUSHER_URL: http://play.workadventure.localhost
+            UPLOADER_URL: http://uploader.workadventure.localhost
+            ICON_URL: http://icon.workadventure.localhost
+            STUN_SERVER: "stun:stun.l.google.com:19302"
+            TURN_SERVER: "$TURN_SERVER"
+            DISABLE_NOTIFICATIONS: "$DISABLE_NOTIFICATIONS"
+            SKIP_RENDER_OPTIMIZATIONS: "$SKIP_RENDER_OPTIMIZATIONS"
+            # Use TURN_USER/TURN_PASSWORD if your Coturn server is secured via hard coded credentials.
+            # Advice: you should instead use Coturn REST API along the TURN_STATIC_AUTH_SECRET in the Back container
+            TURN_USER: ""
+            TURN_PASSWORD: ""
+            MAX_PER_GROUP: "$MAX_PER_GROUP"
+            MAX_USERNAME_LENGTH: "$MAX_USERNAME_LENGTH"
+            # Note: ENABLE_OPENID needs to have any not falsy value to be enabled.
+            OPID_CLIENT_ID: $OPID_CLIENT_ID
+            OPID_CLIENT_SECRET: $OPID_CLIENT_SECRET
+            OPID_CLIENT_ISSUER: $OPID_CLIENT_ISSUER
+            OPID_PROFILE_SCREEN_PROVIDER: $OPID_PROFILE_SCREEN_PROVIDER
+            OPID_SCOPE: $OPID_SCOPE
+            OPID_PROMPT: $OPID_PROMPT
+            OPID_USERNAME_CLAIM: $OPID_USERNAME_CLAIM
+            OPID_LOCALE_CLAIM: $OPID_LOCALE_CLAIM
+            OPID_LOGOUT_REDIRECT_URL: "$OPID_LOGOUT_REDIRECT_URL"
+            CHAT_URL: http://chat.workadventure.localhost
+            SECRET_KEY: "$SECRET_KEY"
+            ADMIN_API_TOKEN: "$ADMIN_API_TOKEN"
+            API_URL: back:50051
+            DISABLE_ANONYMOUS: $DISABLE_ANONYMOUS
+            PUBLIC_MAP_STORAGE_URL: "http://map-storage.workadventure.localhost"
+            ENABLE_OPENAPI_ENDPOINT: "true"
+            START_ROOM_URL: "$START_ROOM_URL"
+            # Only used if you set up a JWT authentication mechanism in Ejabberd
+            EJABBERD_JWT_SECRET: $EJABBERD_JWT_SECRET
+            EJABBERD_DOMAIN: $EJABBERD_DOMAIN
+            ENABLE_CHAT: "$ENABLE_CHAT"
+            ENABLE_CHAT_UPLOAD: "$ENABLE_CHAT_UPLOAD"
+            ENABLE_CHAT_ONLINE_LIST: "$ENABLE_CHAT_ONLINE_LIST"
+            ENABLE_CHAT_DISCONNECTED_LIST: "$ENABLE_CHAT_DISCONNECTED_LIST"
+            SERVER_NAME: $SERVER_NAME
+            SERVER_MOTD: $SERVER_MOTD
+            SERVER_ICON: $SERVER_ICON
+            # Report issues menu
+            ENABLE_REPORT_ISSUES_MENU: $ENABLE_REPORT_ISSUES_MENU
+            REPORT_ISSUES_URL: $REPORT_ISSUES_URL
+            # LogRocket
+            LOGROCKET_ID: $LOGROCKET_ID
+            # Sentry integration
+            SENTRY_DSN_FRONT: $SENTRY_DSN_FRONT
+            SENTRY_DSN_PUSHER: $SENTRY_DSN_PUSHER
+            SENTRY_ENVIRONMENT: $SENTRY_ENVIRONMENT
+            SENTRY_RELEASE: $SENTRY_RELEASE
+            SENTRY_ORG: $SENTRY_ORG
+            SENTRY_PROJECT: $SENTRY_PROJECT
+            # Room API
+            ROOM_API_PORT: "50051"
+            ROOM_API_SECRET_KEY: ${ROOM_API_SECRET_KEY}
+            #GRPC_VERBOSITY: DEBUG
+            #GRPC_TRACE: all
+            JITSI_DOMAIN: "$JITSI_DOMAIN"
+            JITSI_MUC_DOMAIN: "$JITSI_MUC_DOMAIN"
+            JITSI_XMPP_DOMAIN: "$JITSI_XMPP_DOMAIN"
+            FEATURE_FLAG_BROADCAST_AREAS: "true"
+            # Integration tools
+            KLAXOON_ENABLED: "$KLAXOON_ENABLED"
+            KLAXOON_CLIENT_ID: "$KLAXOON_CLIENT_ID"
+            YOUTUBE_ENABLED: "$YOUTUBE_ENABLED"
+            GOOGLE_DOCS_ENABLED: "$GOOGLE_DOCS_ENABLED"
+            GOOGLE_SHEETS_ENABLED: "$GOOGLE_SHEETS_ENABLED"
+            GOOGLE_SLIDES_ENABLED: "$GOOGLE_SLIDES_ENABLED"
+            WHITE_LISTE_EMBEDAABLE_DOMAINS: "$WHITE_LISTE_EMBEDAABLE_DOMAINS"
+            # Report issues menu
+            ACTIVE_REPORT_ISSUES_MENU: "true"
+            URL_REPORT_ISSUES: "https://github.com/workadventure/workadventure/issues"
+            PEER_VIDEO_LOW_BANDWIDTH: "$PEER_VIDEO_LOW_BANDWIDTH"
+            PEER_VIDEO_RECOMMENDED_BANDWIDTH: "$PEER_VIDEO_RECOMMENDED_BANDWIDTH"
+            PEER_SCREEN_SHARE_LOW_BANDWIDTH: "$PEER_SCREEN_SHARE_LOW_BANDWIDTH"
+            PEER_SCREEN_SHARE_RECOMMENDED_BANDWIDTH: "$PEER_SCREEN_SHARE_RECOMMENDED_BANDWIDTH"
+        labels:
+            - "traefik.enable=true"
+            - "traefik.http.routers.front.rule=Host(`front.workadventure.localhost`)"
+            - "traefik.http.routers.front.service=front"
+            - "traefik.http.services.front.loadbalancer.server.port=8080"
+            - "traefik.http.routers.room-api.rule=Host(`room-api.workadventure.localhost`)"
+            - "traefik.http.routers.room-api.service=room-api"
+            - "traefik.http.services.room-api.loadbalancer.server.port=50051"
+            - "traefik.http.services.room-api.loadbalancer.server.scheme=h2c"
+            - "traefik.http.routers.play.rule=HostRegexp(`{domain:.*}`)"
+            - "traefik.http.routers.play.priority=1"
+            - "traefik.http.routers.play.service=play"
+            - "traefik.http.services.play.loadbalancer.server.port=3000"
 
+    chat:
+        image: thecodingmachine/nodejs:v2-18-bullseye
+        command: npm run start
+        working_dir: /usr/src/app/chat
+        environment:
+            STARTUP_COMMAND_1: ../wait-proto.sh
+            STARTUP_COMMAND_2: ../npm-install.sh
+            STARTUP_COMMAND_3: npm run typesafe-i18n
+            PUSHER_URL: http://play.workadventure.localhost
+            UPLOADER_URL: http://uploader.workadventure.localhost
+            EMBEDLY_KEY: "$EMBEDLY_KEY"
+            ICON_URL: http://icon.workadventure.localhost
+            EJABBERD_DOMAIN: $EJABBERD_DOMAIN
+            EJABBERD_WS_URI: ws://xmpp.workadventure.localhost:5443/ws
+            ENABLE_OPENID: "$OPID_CLIENT_ID"
+            ENABLE_CHAT_UPLOAD: "$ENABLE_CHAT_UPLOAD"
+            # Sentry integration
+            SENTRY_DSN: "$SENTRY_DSN_CHAT"
+            SENTRY_ENVIRONMENT: $SENTRY_ENVIRONMENT
+            SENTRY_ORG: "$SENTRY_ORG"
+            SENTRY_PROJECT: "$SENTRY_PROJECT"
+            SENTRY_AUTH_TOKEN: "$SENTRY_AUTH_TOKEN"
+            SENTRY_RELEASE: "$SENTRY_RELEASE"
+        volumes:
+            - .:/usr/src/app
+        labels:
+            - "traefik.enable=true"
+            - "traefik.http.routers.chat.rule=Host(`chat.workadventure.localhost`)"
+            - "traefik.http.routers.chat.entryPoints=web"
+            - "traefik.http.services.chat.loadbalancer.server.port=8080"
   back:
     image: thecodingmachine/workadventure-back:${VERSION}
     command: yarn run runprod
@@ -215,34 +260,50 @@ services:
             - "traefik.http.routers.map-storage-ui.service=map-storage-ui"
             - "traefik.http.services.map-storage-ui.loadbalancer.server.port=8080"
 
-  uploader:
-    image: thecodingmachine/workadventure-uploader:${VERSION}
-    environment:
-      - UPLOADER_URL=https://${UPLOADER_HOST}
-      #AWS
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}
-      - AWS_BUCKET=${AWS_BUCKET}
-      - AWS_URL=${AWS_URL}
-      - AWS_ENDPOINT=${AWS_ENDPOINT}
-      #REDIS
-      - REDIS_HOST=${UPLOADER_REDIS_HOST}
-      - REDIS_PORT=${UPLOADER_REDIS_PORT}
-      #CHAT
-      - ADMIN_API_URL=${ADMIN_API_URL}
-      - ENABLE_CHAT_UPLOAD=${ENABLE_CHAT_UPLOAD}
-      - UPLOAD_MAX_FILESIZE=${UPLOAD_MAX_FILESIZE}
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.uploader.rule=Host(`${UPLOADER_HOST}`)"
-      - "traefik.http.routers.uploader.entryPoints=web"
-      - "traefik.http.services.uploader.loadbalancer.server.port=8080"
-      - "traefik.http.routers.uploader-ssl.rule=Host(`${UPLOADER_HOST}`)"
-      - "traefik.http.routers.uploader-ssl.entryPoints=websecure"
-      - "traefik.http.routers.uploader-ssl.service=uploader"
-      - "traefik.http.routers.uploader-ssl.tls=true"
-      - "traefik.http.routers.uploader-ssl.tls.certresolver=myresolver"
+    uploader:
+        image: thecodingmachine/nodejs:v2-18-bullseye
+        command: npm run dev
+        #command: npm run profile
+        working_dir: /usr/src/app/uploader
+        environment:
+            DEBUG: "*"
+            STARTUP_COMMAND_1: ../npm-install.sh
+            UPLOADER_URL: http://uploader.workadventure.localhost
+            #AWS
+            AWS_ACCESS_KEY_ID: "$AWS_ACCESS_KEY_ID"
+            AWS_SECRET_ACCESS_KEY: "$AWS_SECRET_ACCESS_KEY"
+            AWS_DEFAULT_REGION: "$AWS_DEFAULT_REGION"
+            AWS_BUCKET: "$AWS_BUCKET"
+            AWS_ENDPOINT: "$AWS_ENDPOINT"
+            UPLOADER_AWS_SIGNED_URL_EXPIRATION: "$UPLOADER_AWS_SIGNED_URL_EXPIRATION"
+            #REDIS
+            REDIS_HOST: "$UPLOADER_REDIS_HOST"
+            REDIS_PORT: "$UPLOADER_REDIS_PORT"
+            REDIS_DB_NUMBER: "$UPLOADER_REDIS_DB_NUMBER"
+            ENABLE_CHAT_UPLOAD: "$ENABLE_CHAT_UPLOAD"
+            UPLOAD_MAX_FILESIZE: "$UPLOAD_MAX_FILESIZE"
+        volumes:
+            - .:/usr/src/app
+        ports:
+            - "9234:9229"
+        labels:
+            - "traefik.enable=true"
+            - "traefik.http.routers.uploader.rule=Host(`uploader.workadventure.localhost`)"
+            - "traefik.http.routers.uploader.entryPoints=web"
+            - "traefik.http.services.uploader.loadbalancer.server.port=8080"
+
+    messages:
+        image: thecodingmachine/nodejs:v2-18-bullseye-build
+        environment:
+            STARTUP_COMMAND_1: npm install
+            STARTUP_COMMAND_2: npm run proto:watch
+        volumes:
+            - ./messages:/usr/src/app
+            - ./back:/usr/src/back
+            - ./play:/usr/src/play
+            - ./chat:/usr/src/chat
+            - ./map-storage:/usr/src/map-storage
+            - ./libs:/usr/src/libs
 
   icon:
     image: matthiasluedtke/iconserver:v3.13.0
@@ -257,10 +318,22 @@ services:
       - "traefik.http.routers.icon-ssl.tls=true"
       - "traefik.http.routers.icon-ssl.tls.certresolver=myresolver"
 
-  redis:
-    image: redis:6
-    volumes:
-      - redisdata:/data
+
+    redisinsight:
+        image: redislabs/redisinsight:latest
+        labels:
+            - "traefik.enable=true"
+            - "traefik.http.routers.redisinsight.rule=Host(`redis.workadventure.localhost`)"
+            - "traefik.http.routers.redisinsight.entryPoints=web"
+            - "traefik.http.services.redisinsight.loadbalancer.server.port=8001"
+
+    icon:
+        image: matthiasluedtke/iconserver:v3.15.0
+        labels:
+            - "traefik.enable=true"
+            - "traefik.http.routers.icon.rule=Host(`icon.workadventure.localhost`)"
+            - "traefik.http.routers.icon.entryPoints=web"
+            - "traefik.http.services.icon.loadbalancer.server.port=8080"
 
   ejabberd:
     image: workadventure/ejabberd:v1
