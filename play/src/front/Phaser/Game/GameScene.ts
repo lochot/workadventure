@@ -111,6 +111,7 @@ import {
     chatVisibilityStore,
     _newChatMessageSubject,
     _newChatMessageWritingStatusSubject,
+    forceRefreshChatStore,
 } from "../../Stores/ChatStore";
 import type { HasPlayerMovedInterface } from "../../Api/Events/HasPlayerMovedInterface";
 import { gameSceneIsLoadedStore, gameSceneStore } from "../../Stores/GameSceneStore";
@@ -208,6 +209,7 @@ export class GameScene extends DirtyScene {
     private iframeSubscriptionList!: Array<Subscription>;
     private gameMapChangedSubscription!: Subscription;
     private messageSubscription: Subscription | null = null;
+    private rxJsSubscriptions: Array<Subscription> = [];
 
     private peerStoreUnsubscriber!: Unsubscriber;
     private emoteUnsubscriber!: Unsubscriber;
@@ -224,6 +226,7 @@ export class GameScene extends DirtyScene {
     private refreshPromptStoreStoreUnsubscriber!: Unsubscriber;
 
     private modalVisibilityStoreUnsubscriber!: Unsubscriber;
+    private unsubscribers: Unsubscriber[] = [];
 
     mapUrlFile!: string;
     wamUrlFile?: string;
@@ -282,21 +285,21 @@ export class GameScene extends DirtyScene {
     private playersDebugLogAlreadyDisplayed = false;
     private _broadcastService: BroadcastService | undefined;
 
-    constructor(private room: Room, customKey?: string | undefined) {
+    constructor(private _room: Room, customKey?: string | undefined) {
         super({
-            key: customKey ?? room.key,
+            key: customKey ?? _room.key,
         });
 
         this.Terrains = [];
         this.groups = new Map<number, Sprite>();
 
         // TODO: How to get mapUrl from WAM here?
-        if (room.mapUrl) {
-            this.mapUrlFile = room.mapUrl;
-        } else if (room.wamUrl) {
-            this.wamUrlFile = room.wamUrl;
+        if (_room.mapUrl) {
+            this.mapUrlFile = _room.mapUrl;
+        } else if (_room.wamUrl) {
+            this.wamUrlFile = _room.wamUrl;
         }
-        this.roomUrl = room.key;
+        this.roomUrl = _room.key;
 
         this.entitiesCollectionsManager = new EntitiesCollectionsManager();
 
@@ -545,6 +548,7 @@ export class GameScene extends DirtyScene {
 
             switch (itemType) {
                 case "computer": {
+                    //eslint-disable-next-line no-await-in-loop
                     const module = await import("../Items/Computer/computer");
                     itemFactory = module.default;
                     break;
@@ -603,9 +607,9 @@ export class GameScene extends DirtyScene {
 
         this.outlineManager = new OutlineManager(this);
         gameManager.gameSceneIsCreated(this);
-        urlManager.pushRoomIdToUrl(this.room);
-        analyticsClient.enteredRoom(this.room.id, this.room.group);
-        contactPageStore.set(this.room.contactPage);
+        urlManager.pushRoomIdToUrl(this._room);
+        analyticsClient.enteredRoom(this._room.id, this._room.group);
+        contactPageStore.set(this._room.contactPage);
 
         if (touchScreenManager.supportTouchScreen) {
             this.pinchManager = new PinchManager(this);
@@ -773,7 +777,7 @@ export class GameScene extends DirtyScene {
         this.initCirclesCanvas();
 
         // Let's pause the scene if the connection is not established yet
-        if (!this.room.isDisconnected()) {
+        if (!this._room.isDisconnected()) {
             if (this.isReconnecting) {
                 setTimeout(() => {
                     if (this.connection === undefined) {
@@ -796,7 +800,7 @@ export class GameScene extends DirtyScene {
                                 code: "CONNECTION_LOST",
                                 title: get(LL).warning.connectionLostTitle(),
                                 details: get(LL).warning.connectionLostSubtitle(),
-                                image: this.room.errorSceneLogo,
+                                image: this._room.errorSceneLogo,
                             })
                         );
                     }
@@ -853,7 +857,7 @@ export class GameScene extends DirtyScene {
 
         new GameMapPropertiesListener(this, this.gameMapFrontWrapper).register();
 
-        if (!this.room.isDisconnected()) {
+        if (!this._room.isDisconnected()) {
             try {
                 this.hide();
             } catch (err) {
@@ -946,6 +950,8 @@ export class GameScene extends DirtyScene {
                 userIsAdminStore.set(this.connection.hasTag("admin"));
                 userIsEditorStore.set(this.connection.hasTag("editor"));
 
+                // The userJoinedMessageStream stream is completed in the RoomConnection. No need to unsubscribe.
+                //eslint-disable-next-line rxjs/no-ignored-subscription, svelte/no-ignored-unsubscribe
                 this.connection.userJoinedMessageStream.subscribe((message) => {
                     this.remotePlayersRepository.addPlayer(message);
 
@@ -963,6 +969,8 @@ export class GameScene extends DirtyScene {
                     });
                 });
 
+                // The userMovedMessageStream stream is completed in the RoomConnection. No need to unsubscribe.
+                //eslint-disable-next-line rxjs/no-ignored-subscription, svelte/no-ignored-unsubscribe
                 this.connection.userMovedMessageStream.subscribe((message) => {
                     this.remotePlayersRepository.movePlayer(message);
                     const position = message.position;
@@ -978,6 +986,8 @@ export class GameScene extends DirtyScene {
                     this.updatePlayerPosition(messageUserMoved);
                 });
 
+                // The userLeftMessageStream stream is completed in the RoomConnection. No need to unsubscribe.
+                //eslint-disable-next-line rxjs/no-ignored-subscription, svelte/no-ignored-unsubscribe
                 this.connection.userLeftMessageStream.subscribe((message) => {
                     this.remotePlayersRepository.removePlayer(message.userId);
                     this.playersEventDispatcher.postMessage({
@@ -986,12 +996,16 @@ export class GameScene extends DirtyScene {
                     });
                 });
 
+                // The refreshRoomMessageStream stream is completed in the RoomConnection. No need to unsubscribe.
+                //eslint-disable-next-line rxjs/no-ignored-subscription, svelte/no-ignored-unsubscribe
                 this.connection.refreshRoomMessageStream.subscribe((message) => {
                     refreshPromptStore.set({
                         timeToRefresh: message.timeToRefresh,
                     });
                 });
 
+                // The playerDetailsUpdatedMessageStream stream is completed in the RoomConnection. No need to unsubscribe.
+                //eslint-disable-next-line rxjs/no-ignored-subscription, svelte/no-ignored-unsubscribe
                 this.connection.playerDetailsUpdatedMessageStream.subscribe((message) => {
                     // Is this message for me (exceptionally, we can use this stream to send messages to users
                     // who share the same UUID as us)
@@ -1003,12 +1017,16 @@ export class GameScene extends DirtyScene {
                     this.remotePlayersRepository.updatePlayer(message);
                 });
 
+                // The groupUpdateMessageStream stream is completed in the RoomConnection. No need to unsubscribe.
+                //eslint-disable-next-line rxjs/no-ignored-subscription, svelte/no-ignored-unsubscribe
                 this.connection.groupUpdateMessageStream.subscribe(
                     (groupPositionMessage: GroupCreatedUpdatedMessageInterface) => {
                         this.shareGroupPosition(groupPositionMessage);
                     }
                 );
 
+                // The groupDeleteMessageStream stream is completed in the RoomConnection. No need to unsubscribe.
+                //eslint-disable-next-line rxjs/no-ignored-subscription, svelte/no-ignored-unsubscribe
                 this.connection.groupDeleteMessageStream.subscribe((message) => {
                     try {
                         this.deleteGroup(message.groupId);
@@ -1025,6 +1043,8 @@ export class GameScene extends DirtyScene {
                 });
                 hideConnectionIssueMessage();
 
+                // The itemEventMessageStream stream is completed in the RoomConnection. No need to unsubscribe.
+                //eslint-disable-next-line rxjs/no-ignored-subscription, svelte/no-ignored-unsubscribe
                 this.connection.itemEventMessageStream.subscribe((message) => {
                     const item = this.actionableItems.get(message.itemId);
                     if (item === undefined) {
@@ -1038,14 +1058,14 @@ export class GameScene extends DirtyScene {
                     item.fire(message.event, message.state, message.parameters);
                 });
 
+                // The groupUsersUpdateMessageStream stream is completed in the RoomConnection. No need to unsubscribe.
+                //eslint-disable-next-line rxjs/no-ignored-subscription, svelte/no-ignored-unsubscribe
                 this.connection.groupUsersUpdateMessageStream.subscribe((message) => {
                     this.currentPlayerGroupId = message.groupId;
                 });
 
-                this.connection.groupUsersUpdateMessageStream.subscribe((message) => {
-                    this.currentPlayerGroupId = message.groupId;
-                });
-
+                // The joinMucRoomMessageStream stream is completed in the RoomConnection. No need to unsubscribe.
+                //eslint-disable-next-line rxjs/no-ignored-subscription, svelte/no-ignored-unsubscribe
                 this.connection.joinMucRoomMessageStream.subscribe((mucRoomDefinitionMessage) => {
                     iframeListener.sendJoinMucEventToChatIframe(
                         mucRoomDefinitionMessage.url,
@@ -1054,10 +1074,15 @@ export class GameScene extends DirtyScene {
                         mucRoomDefinitionMessage.subscribe
                     );
                 });
+
+                // The leaveMucRoomMessageStream stream is completed in the RoomConnection. No need to unsubscribe.
+                //eslint-disable-next-line rxjs/no-ignored-subscription, svelte/no-ignored-unsubscribe
                 this.connection.leaveMucRoomMessageStream.subscribe((leaveMucRoomMessage) => {
                     iframeListener.sendLeaveMucEventToChatIframe(leaveMucRoomMessage.url);
                 });
 
+                // The worldFullMessageStream stream is completed in the RoomConnection. No need to unsubscribe.
+                //eslint-disable-next-line rxjs/no-ignored-subscription, svelte/no-ignored-unsubscribe
                 this.messageSubscription = this.connection.worldFullMessageStream.subscribe((message) => {
                     this.showWorldFullError(message);
                 });
@@ -1088,9 +1113,9 @@ export class GameScene extends DirtyScene {
                 const playerVariables: Map<string, unknown> = onConnect.room.playerVariables;
                 // If the user is not logged, we initialize the variables with variables from the local storage
                 if (!localUserStore.isLogged()) {
-                    if (this.room.group) {
+                    if (this._room.group) {
                         for (const [key, { isPublic, value }] of localUserStore
-                            .getAllUserProperties(this.room.group)
+                            .getAllUserProperties(this._room.group)
                             .entries()) {
                             if (isPublic) {
                                 this.connection?.emitPlayerSetVariable({
@@ -1106,7 +1131,7 @@ export class GameScene extends DirtyScene {
                     }
 
                     for (const [key, { isPublic, value }] of localUserStore
-                        .getAllUserProperties(this.room.id)
+                        .getAllUserProperties(this._room.id)
                         .entries()) {
                         if (isPublic) {
                             this.connection?.emitPlayerSetVariable({
@@ -1124,10 +1149,12 @@ export class GameScene extends DirtyScene {
                     this.connection,
                     this.playersEventDispatcher,
                     playerVariables,
-                    this.room.id,
-                    this.room.group ?? undefined
+                    this._room.id,
+                    this._room.group ?? undefined
                 );
 
+                // The xmppSettingsMessageStream is completed in the RoomConnection. No need to unsubscribe.
+                //eslint-disable-next-line rxjs/no-ignored-subscription, svelte/no-ignored-unsubscribe
                 this.connection.xmppSettingsMessageStream.subscribe((xmppSettingsMessage) => {
                     if (xmppSettingsMessage) {
                         iframeListener.sendXmppSettingsToChatIframe(xmppSettingsMessage);
@@ -1137,6 +1164,8 @@ export class GameScene extends DirtyScene {
                 const broadcastService = new BroadcastService(this.connection);
                 this._broadcastService = broadcastService;
 
+                // The megaphoneSettingsMessageStream is completed in the RoomConnection. No need to unsubscribe.
+                //eslint-disable-next-line rxjs/no-ignored-subscription, svelte/no-ignored-unsubscribe
                 this.connection.megaphoneSettingsMessageStream.subscribe((megaphoneSettingsMessage) => {
                     if (megaphoneSettingsMessage) {
                         megaphoneCanBeUsedStore.set(megaphoneSettingsMessage.enabled);
@@ -1298,21 +1327,29 @@ export class GameScene extends DirtyScene {
             //this.reposition();
         });
 
-        requestedCameraState.subscribe((state) => {
-            this.connection?.emitCameraState(state);
-        });
+        this.unsubscribers.push(
+            requestedCameraState.subscribe((state) => {
+                this.connection?.emitCameraState(state);
+            })
+        );
 
-        requestedMicrophoneState.subscribe((state) => {
-            this.connection?.emitMicrophoneState(state);
-        });
+        this.unsubscribers.push(
+            requestedMicrophoneState.subscribe((state) => {
+                this.connection?.emitMicrophoneState(state);
+            })
+        );
 
-        requestedScreenSharingState.subscribe((state) => {
-            this.connection?.emitScreenSharingState(state);
-        });
+        this.unsubscribers.push(
+            requestedScreenSharingState.subscribe((state) => {
+                this.connection?.emitScreenSharingState(state);
+            })
+        );
 
-        megaphoneEnabledStore.subscribe((state) => {
-            this.connection?.emitMegaphoneState(state);
-        });
+        this.unsubscribers.push(
+            megaphoneEnabledStore.subscribe((state) => {
+                this.connection?.emitMegaphoneState(state);
+            })
+        );
 
         const talkIconVolumeTreshold = 10;
         let oldPeersNumber = 0;
@@ -1907,7 +1944,7 @@ ${escapedMessage}
                 //playerVariables: localUserStore.getAllUserProperties(),
                 playerVariables: this.playerVariablesManager.variables,
                 userRoomToken: this.connection ? this.connection.userRoomToken : "",
-                metadata: this.room.metadata,
+                metadata: this._room.metadata,
                 iframeId: source ? iframeListener.getUIWebsiteIframeIdFromSource(source) : undefined,
                 isLogged: localUserStore.isLogged(),
             };
@@ -2005,6 +2042,7 @@ ${escapedMessage}
                             for (const layer of this.Map.layers) {
                                 layer.tilemapLayer.destroy(false);
                             }
+                            this.gameMapFrontWrapper?.close();
                             //Create a new GameMap with the changed file
                             this.gameMapFrontWrapper = new GameMapFrontWrapper(
                                 this,
@@ -2024,9 +2062,11 @@ ${escapedMessage}
                             resolve(newFirstgid);
                         });
                     });
-                    this.load.on("loaderror", () => {
-                        console.error("Error while loading " + eventTileset.url + ".");
-                        reject(-1);
+                    this.load.on("loaderror", (file: Phaser.Loader.File) => {
+                        if (file.src === eventTileset.url) {
+                            console.error("Error while loading " + eventTileset.url + ".");
+                            reject(new Error("Error while loading " + eventTileset.url + "."));
+                        }
                     });
 
                     this.load.json(eventTileset.url, eventTileset.url);
@@ -2114,6 +2154,22 @@ ${escapedMessage}
             return this.CurrentPlayer.setPathToFollow(path, message.speed);
         });
 
+        iframeListener.registerAnswerer("teleportPlayerTo", (message) => {
+            this.CurrentPlayer.x = message.x;
+            this.CurrentPlayer.y = message.y;
+            this.CurrentPlayer.finishFollowingPath(true);
+            // clear properties in case we are moved on the same layer / area in order to trigger them
+            //this.gameMapFrontWrapper.clearCurrentProperties();
+
+            this.handleCurrentPlayerHasMovedEvent({
+                x: message.x,
+                y: message.y,
+                direction: this.CurrentPlayer.lastDirection,
+                moving: false,
+            });
+            this.markDirty();
+        });
+
         iframeListener.registerAnswerer("getWoka", () => {
             return new Promise((res, rej) => {
                 const woka = get(currentPlayerWokaStore);
@@ -2160,8 +2216,11 @@ ${escapedMessage}
         this.gameMapFrontWrapper.setDynamicAreaProperty(areaName, propertyName, propertyValue);
     }
 
-    public getMapDirUrl(): string {
-        return this.mapUrlFile.substring(0, this.mapUrlFile.lastIndexOf("/"));
+    public getMapUrl(): string {
+        if (!this.mapUrlFile) {
+            throw new Error("Trying to access mapUrl before it was fetched");
+        }
+        return this.mapUrlFile;
     }
 
     public async onMapExit(roomUrl: URL) {
@@ -2193,7 +2252,7 @@ ${escapedMessage}
 
         urlManager.pushStartLayerNameToUrl(roomUrl.hash);
 
-        if (!targetRoom.isEqual(this.room)) {
+        if (!targetRoom.isEqual(this._room)) {
             if (this.scene.get(targetRoom.key) === null) {
                 console.error("next room not loaded", targetRoom.key);
                 // Try to load next game room from exit URL
@@ -2204,6 +2263,7 @@ ${escapedMessage}
             this.scene.stop();
             this.scene.start(targetRoom.key);
             this.scene.remove(this.scene.key);
+            forceRefreshChatStore.forceRefresh();
         } else {
             //if the exit points to the current map, we simply teleport the user back to the startLayer
             this.startPositionCalculator.initStartXAndStartY(urlManager.getStartPositionNameFromUrl());
@@ -2213,6 +2273,16 @@ ${escapedMessage}
             // clear properties in case we are moved on the same layer / area in order to trigger them
             this.gameMapFrontWrapper.clearCurrentProperties();
             this.gameMapFrontWrapper.setPosition(this.CurrentPlayer.x, this.CurrentPlayer.y);
+
+            // TODO: we should have a "teleport" parameter to explicitly say the user teleports and should not be moved in 200ms to the new place.
+            this.handleCurrentPlayerHasMovedEvent({
+                x: this.CurrentPlayer.x,
+                y: this.CurrentPlayer.y,
+                direction: this.CurrentPlayer.lastDirection,
+                moving: false,
+            });
+
+            this.markDirty();
             setTimeout(() => (this.mapTransitioning = false), 500);
         }
     }
@@ -2265,11 +2335,16 @@ ${escapedMessage}
         this.emoteUnsubscriber?.();
         this.emoteMenuUnsubscriber?.();
         this.followUsersColorStoreUnsubscriber?.();
+        this.modalVisibilityStoreUnsubscriber?.();
         this.highlightedEmbedScreenUnsubscriber?.();
         this.embedScreenLayoutStoreUnsubscriber?.();
         this.userIsJitsiDominantSpeakerStoreUnsubscriber?.();
         this.jitsiParticipantsCountStoreUnsubscriber?.();
         this.availabilityStatusStoreUnsubscriber?.();
+        for (const unsubscriber of this.unsubscribers) {
+            unsubscriber();
+        }
+        this.unsubscribers = [];
         iframeListener.unregisterAnswerer("getState");
         iframeListener.unregisterAnswerer("loadTileset");
         iframeListener.unregisterAnswerer("getMapData");
@@ -2291,6 +2366,7 @@ ${escapedMessage}
         this.areaManager?.close();
         this.playersEventDispatcher.cleanup();
         this.playersMovementEventDispatcher.cleanup();
+        this.gameMapFrontWrapper?.close();
 
         //When we leave game, the camera is stop to be reopen after.
         // I think that we could keep camera status and the scene can manage camera setup
@@ -2300,6 +2376,10 @@ ${escapedMessage}
         for (const iframeEvents of this.iframeSubscriptionList) {
             iframeEvents.unsubscribe();
         }
+        for (const subscription of this.rxJsSubscriptions) {
+            subscription.unsubscribe();
+        }
+        this.rxJsSubscriptions = [];
         this.gameMapChangedSubscription?.unsubscribe();
         this.messageSubscription?.unsubscribe();
         gameSceneIsLoadedStore.set(false);
@@ -2809,26 +2889,30 @@ ${escapedMessage}
     }
 
     private subscribeToEntitiesManagerObservables(): void {
-        this.gameMapFrontWrapper
-            .getEntitiesManager()
-            .getPointerOverEntityObservable()
-            .subscribe((entity) => {
-                if (get(mapEditorModeStore)) {
-                    return;
-                }
-                this.activatablesManager.handlePointerOverActivatableObject(entity);
-                this.markDirty();
-            });
-        this.gameMapFrontWrapper
-            .getEntitiesManager()
-            .getPointerOutEntityObservable()
-            .subscribe((entity) => {
-                if (get(mapEditorModeStore)) {
-                    return;
-                }
-                this.activatablesManager.handlePointerOutActivatableObject();
-                this.markDirty();
-            });
+        this.rxJsSubscriptions.push(
+            this.gameMapFrontWrapper
+                .getEntitiesManager()
+                .getPointerOverEntityObservable()
+                .subscribe((entity) => {
+                    if (get(mapEditorModeStore)) {
+                        return;
+                    }
+                    this.activatablesManager.handlePointerOverActivatableObject(entity);
+                    this.markDirty();
+                })
+        );
+        this.rxJsSubscriptions.push(
+            this.gameMapFrontWrapper
+                .getEntitiesManager()
+                .getPointerOutEntityObservable()
+                .subscribe((entity) => {
+                    if (get(mapEditorModeStore)) {
+                        return;
+                    }
+                    this.activatablesManager.handlePointerOutActivatableObject();
+                    this.markDirty();
+                })
+        );
     }
 
     private doRemovePlayer(userId: number) {
@@ -2970,6 +3054,9 @@ ${escapedMessage}
 
     public sendViewportToServer(margin = 300): void {
         const camera = this.cameras.main;
+        if (!camera) {
+            return;
+        }
         this.connection?.setViewport({
             left: Math.max(0, camera.scrollX - margin),
             top: Math.max(0, camera.scrollY - margin),
@@ -3057,7 +3144,7 @@ ${escapedMessage}
 
     public createSuccessorGameScene(autostart: boolean, reconnecting: boolean) {
         const gameSceneKey = "somekey" + Math.round(Math.random() * 10000);
-        const game = new GameScene(this.room, gameSceneKey);
+        const game = new GameScene(this._room, gameSceneKey);
         this.scene.add(gameSceneKey, game, autostart, {
             initPosition: {
                 x: this.CurrentPlayer.x,
@@ -3116,5 +3203,9 @@ ${escapedMessage}
             throw new Error("BroadcastService not initialized yet.");
         }
         return this._broadcastService;
+    }
+
+    get room(): Room {
+        return this._room;
     }
 }

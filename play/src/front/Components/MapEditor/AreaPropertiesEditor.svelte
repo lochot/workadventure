@@ -61,6 +61,7 @@
                 return {
                     id,
                     type,
+                    isDefault: true,
                 };
             case "silent":
                 return {
@@ -425,7 +426,7 @@
         <input id="objectName" type="text" placeholder="Value" bind:value={areaName} on:change={onUpdateName} />
     </div>
     <div class="properties-container">
-        {#each properties as property}
+        {#each properties as property (property.id)}
             <div class="property-box">
                 {#if property.type === "focusable"}
                     <FocusablePropertyEditor
@@ -485,6 +486,7 @@
                     />
                 {:else if property.type === "start"}
                     <StartPropertyEditor
+                        {property}
                         on:close={() => {
                             onDeleteProperty(property.id);
                         }}

@@ -540,7 +540,7 @@ export class IoSocketController {
                             jabberId: userData.jabberId,
                             jabberPassword: userData.jabberPassword,
                             mucRooms: userData.mucRooms || undefined,
-                            activatedInviteUser: userData.activatedInviteUser || undefined,
+                            activatedInviteUser: userData.activatedInviteUser ?? undefined,
                             canEdit: userData.canEdit ?? false,
                             applications: userData.applications,
                             position: {
@@ -855,6 +855,13 @@ export class IoSocketController {
                                 }
                                 case "embeddableWebsiteQuery": {
                                     void socketManager.handleEmbeddableWebsiteQuery(
+                                        client,
+                                        message.message.queryMessage
+                                    );
+                                    break;
+                                }
+                                case "roomsFromSameWorldQuery": {
+                                    void socketManager.handleRoomsFromSameWorldQuery(
                                         client,
                                         message.message.queryMessage
                                     );

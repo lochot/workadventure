@@ -81,9 +81,9 @@ export class AreasPropertiesListener {
                         break;
                     }
                     case "exit": {
-                        let url = `/~/${property.url}`;
+                        let url = `${property.url}`;
                         if (property.areaName && property.areaName !== "") {
-                            url = `/~/${property.url}#${property.areaName}`;
+                            url = `${property.url}#${property.areaName}`;
                         }
                         this.handleExitPropertyOnEnter(url);
                         break;
@@ -141,7 +141,7 @@ export class AreasPropertiesListener {
 
     private handlePlayAudioPropertyOnEnter(property: PlayAudioPropertyData): void {
         // playAudioLoop is supposedly deprecated. Should we ignore it?
-        audioManagerFileStore.playAudio(property.audioLink, this.scene.getMapDirUrl(), property.volume);
+        audioManagerFileStore.playAudio(property.audioLink, this.scene.getMapUrl(), property.volume);
         audioManagerVisibilityStore.set(true);
     }
 
@@ -273,14 +273,10 @@ export class AreasPropertiesListener {
 
             inJitsiStore.set(true);
 
-            const closable = property.closable;
-
             const coWebsite = new JitsiCoWebsite(
                 new URL(domain),
-                false,
-                undefined,
-                undefined,
-                closable,
+                property.width,
+                property.closable,
                 roomName,
                 gameManager.getPlayerName() ?? "unknown",
                 jwt,
@@ -457,7 +453,7 @@ export class AreasPropertiesListener {
     private handleListenerMegaphonePropertyOnEnter(property: ListenerMegaphonePropertyData): void {
         if (property.speakerZoneName !== undefined) {
             const speakerZoneName = getSpeakerMegaphoneAreaName(
-                gameManager.getCurrentGameScene().getGameMap().getGameMapAreas()?.getAreas(),
+                this.scene.getGameMap().getGameMapAreas()?.getAreas(),
                 property.speakerZoneName
             );
             if (speakerZoneName) {
@@ -473,7 +469,7 @@ export class AreasPropertiesListener {
     private handleListenerMegaphonePropertyOnLeave(property: ListenerMegaphonePropertyData): void {
         if (property.speakerZoneName !== undefined) {
             const speakerZoneName = getSpeakerMegaphoneAreaName(
-                gameManager.getCurrentGameScene().getGameMap().getGameMapAreas()?.getAreas(),
+                this.scene.getGameMap().getGameMapAreas()?.getAreas(),
                 property.speakerZoneName
             );
             if (speakerZoneName) {
@@ -487,17 +483,12 @@ export class AreasPropertiesListener {
     }
 
     private handleJoinMucRoom(name: string, type: string) {
-        iframeListener.sendJoinMucEventToChatIframe(
-            `${gameManager.getCurrentGameScene().roomUrl}/${slugify(name)}`,
-            name,
-            type,
-            false
-        );
+        iframeListener.sendJoinMucEventToChatIframe(`${this.scene.roomUrl}/${slugify(name)}`, name, type, false);
         chatZoneLiveStore.set(true);
     }
 
     private handleLeaveMucRoom(name: string) {
-        iframeListener.sendLeaveMucEventToChatIframe(`${gameManager.getCurrentGameScene().roomUrl}/${slugify(name)}`);
+        iframeListener.sendLeaveMucEventToChatIframe(`${this.scene.roomUrl}/${slugify(name)}`);
         chatZoneLiveStore.set(false);
     }
 

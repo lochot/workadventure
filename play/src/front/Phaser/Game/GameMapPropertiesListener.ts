@@ -27,9 +27,7 @@ import {
     requestedMicrophoneState,
     isSpeakerStore,
 } from "../../Stores/MediaStore";
-import { urlManager } from "../../Url/UrlManager";
 import { chatZoneLiveStore } from "../../Stores/ChatStore";
-import { connectionManager } from "../../Connection/ConnectionManager";
 import { currentMegaphoneNameStore, requestedMegaphoneStore } from "../../Stores/MegaphoneStore";
 import { analyticsClient } from "./../../Administration/AnalyticsClient";
 import type { GameMapFrontWrapper } from "./GameMap/GameMapFrontWrapper";
@@ -105,6 +103,15 @@ export class GameMapPropertiesListener {
                 const isJitsiUrl = z.string().optional().safeParse(allProps.get(GameMapProperties.JITSI_URL));
                 let jitsiUrl = isJitsiUrl.success ? isJitsiUrl.data : undefined;
 
+                const isJitsiWidth = z
+                    .number()
+                    .min(1)
+                    .max(100)
+                    .default(50)
+                    .optional()
+                    .safeParse(allProps.get(GameMapProperties.JITSI_WIDTH));
+                const jitsiWidth = isJitsiWidth.success ? isJitsiWidth.data : 50;
+
                 let jwt: string | undefined;
                 if (JITSI_PRIVATE_MODE && !jitsiUrl) {
                     if (!this.scene.connection) {
@@ -156,9 +163,7 @@ export class GameMapPropertiesListener {
 
                 const coWebsite = new JitsiCoWebsite(
                     new URL(domain),
-                    false,
-                    undefined,
-                    undefined,
+                    jitsiWidth,
                     true,
                     roomName,
                     gameManager.getPlayerName() ?? "unknown",
@@ -269,7 +274,7 @@ export class GameMapPropertiesListener {
             const loop = allProps.get(GameMapProperties.AUDIO_LOOP) as boolean | undefined;
             newValue === undefined
                 ? audioManagerFileStore.unloadAudio()
-                : audioManagerFileStore.playAudio(newValue, this.scene.getMapDirUrl(), volume, loop);
+                : audioManagerFileStore.playAudio(newValue, this.scene.getMapUrl(), volume, loop);
             audioManagerVisibilityStore.set(!(newValue === undefined));
         });
 
@@ -277,7 +282,7 @@ export class GameMapPropertiesListener {
         this.gameMapFrontWrapper.onPropertyChange(GameMapProperties.PLAY_AUDIO_LOOP, (newValue) => {
             newValue === undefined
                 ? audioManagerFileStore.unloadAudio()
-                : audioManagerFileStore.playAudio(newValue, this.scene.getMapDirUrl(), undefined, true);
+                : audioManagerFileStore.playAudio(newValue, this.scene.getMapUrl(), undefined, true);
             audioManagerVisibilityStore.set(!(newValue === undefined));
         });
 
@@ -293,13 +298,11 @@ export class GameMapPropertiesListener {
 
         // Muc zone
         this.gameMapFrontWrapper.onPropertyChange(GameMapProperties.CHAT_NAME, (newValue, oldValue, allProps) => {
-            if (!connectionManager.currentRoom) {
-                throw new Error("Race condition : Current room is not defined yet");
-            } else if (!connectionManager.currentRoom.enableChat) {
+            if (!this.scene.room.enableChat) {
                 return;
             }
 
-            const playUri = urlManager.getPlayUri() + "/";
+            const playUri = this.scene.roomUrl + "/";
 
             if (oldValue !== undefined) {
                 iframeListener.sendLeaveMucEventToChatIframe(playUri + oldValue);
