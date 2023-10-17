@@ -792,7 +792,7 @@
                 {/if}
                 <!--
                 {#if $userHasAccessToBackOfficeStore}
-                    <!-- svelte-ignore a11y-click-events-have-key-events -->
+                   
                     <div
                         on:dragstart|preventDefault={noDrag}
                         on:click={() => analyticsClient.openBackOffice()}
