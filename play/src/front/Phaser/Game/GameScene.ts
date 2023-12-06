@@ -5,6 +5,7 @@ import type { Unsubscriber } from "svelte/store";
 import { get } from "svelte/store";
 import { throttle } from "throttle-debounce";
 import { MapStore } from "@workadventure/store-utils";
+import { MathUtils } from "@workadventure/math-utils";
 import CancelablePromise from "cancelable-promise";
 import { Deferred } from "ts-deferred";
 import {
@@ -12,6 +13,7 @@ import {
     AvailabilityStatus,
     ErrorScreenMessage,
     PositionMessage_Direction,
+    SpaceFilterMessage,
 } from "@workadventure/messages";
 import { z } from "zod";
 import { ITiledMap, ITiledMapLayer, ITiledMapObject, ITiledMapTileset } from "@workadventure/tiled-map-type-guard";
@@ -26,10 +28,7 @@ import { touchScreenManager } from "../../Touch/TouchScreenManager";
 import { PinchManager } from "../UserInput/PinchManager";
 import { waScaleManager } from "../Services/WaScaleManager";
 import { lazyLoadPlayerCharacterTextures } from "../Entity/PlayerTexturesLoadingManager";
-import {
-    CompanionTexturesLoadingManager,
-    lazyLoadPlayerCompanionTexture,
-} from "../Companion/CompanionTexturesLoadingManager";
+import { lazyLoadPlayerCompanionTexture } from "../Companion/CompanionTexturesLoadingManager";
 import { iframeListener } from "../../Api/IframeListener";
 import {
     DEBUG_MODE,
@@ -44,7 +43,7 @@ import { localUserStore } from "../../Connection/LocalUserStore";
 import { HtmlUtils } from "../../WebRtc/HtmlUtils";
 import { SimplePeer } from "../../WebRtc/SimplePeer";
 import { Loader } from "../Components/Loader";
-import { RemotePlayer, RemotePlayerEvent } from "../Entity/RemotePlayer";
+import { RemotePlayer } from "../Entity/RemotePlayer";
 import { SelectCharacterScene, SelectCharacterSceneName } from "../Login/SelectCharacterScene";
 import { hasMovedEventName, Player, requestEmoteEventName } from "../Player/Player";
 import { ErrorSceneName } from "../Reconnecting/ErrorScene";
@@ -129,11 +128,12 @@ import { refreshPromptStore } from "../../Stores/RefreshPromptStore";
 import { debugAddPlayer, debugRemovePlayer, debugUpdatePlayer } from "../../Utils/Debuggers";
 import { checkCoturnServer } from "../../Components/Video/utils";
 import { BroadcastService } from "../../Streaming/BroadcastService";
-import { megaphoneCanBeUsedStore, megaphoneEnabledStore } from "../../Stores/MegaphoneStore";
+import { megaphoneCanBeUsedStore, liveStreamingEnabledStore } from "../../Stores/MegaphoneStore";
 import { CompanionTextureError } from "../../Exception/CompanionTextureError";
 import { SelectCompanionScene, SelectCompanionSceneName } from "../Login/SelectCompanionScene";
 import { scriptUtils } from "../../Api/ScriptUtils";
 import { requestedScreenSharingState } from "../../Stores/ScreenSharingStore";
+import { JitsiBroadcastSpace } from "../../Streaming/Jitsi/JitsiBroadcastSpace";
 import { GameMapFrontWrapper } from "./GameMap/GameMapFrontWrapper";
 import { gameManager } from "./GameManager";
 import { EmoteManager } from "./EmoteManager";
@@ -161,6 +161,7 @@ import { PlayerVariablesManager } from "./PlayerVariablesManager";
 import { uiWebsiteManager } from "./UI/UIWebsiteManager";
 import { EntitiesCollectionsManager } from "./MapEditor/EntitiesCollectionsManager";
 import { DEPTH_BUBBLE_CHAT_SPRITE } from "./DepthIndexes";
+import { ScriptingEventsManager } from "./ScriptingEventsManager";
 import { faviconManager } from "./../../WebRtc/FaviconManager";
 import EVENT_TYPE = Phaser.Scenes.Events;
 import Texture = Phaser.Textures.Texture;
@@ -248,8 +249,6 @@ export class GameScene extends DirtyScene {
     public userInputManager!: UserInputManager;
     private isReconnecting: boolean | undefined = undefined;
     private playerName!: string;
-    private characterTextureIds!: string[];
-    private companionTextureId!: string | null;
     private popUpElements: Map<number, DOMElement> = new Map<number, Phaser.GameObjects.DOMElement>();
     private originalMapUrl: string | undefined;
     private pinchManager: PinchManager | undefined;
@@ -265,6 +264,7 @@ export class GameScene extends DirtyScene {
     private startPositionCalculator!: StartPositionCalculator;
     private sharedVariablesManager!: SharedVariablesManager;
     private playerVariablesManager!: PlayerVariablesManager;
+    private scriptingEventsManager!: ScriptingEventsManager;
     private objectsByType = new Map<string, ITiledMapObject[]>();
     private embeddedWebsiteManager!: EmbeddedWebsiteManager;
     private areaManager!: DynamicAreaManager;
@@ -280,10 +280,10 @@ export class GameScene extends DirtyScene {
     private playersEventDispatcher = new IframeEventDispatcher();
     private playersMovementEventDispatcher = new IframeEventDispatcher();
     private remotePlayersRepository = new RemotePlayersRepository();
-    private companionLoadingManager: CompanionTexturesLoadingManager | undefined;
     private throttledSendViewportToServer!: () => void;
     private playersDebugLogAlreadyDisplayed = false;
     private _broadcastService: BroadcastService | undefined;
+    private hideTimeout: ReturnType<typeof setTimeout> | undefined;
 
     constructor(private _room: Room, customKey?: string | undefined) {
         super({
@@ -311,7 +311,6 @@ export class GameScene extends DirtyScene {
 
     //hook preload scene
     preload(): void {
-        this.companionLoadingManager = new CompanionTexturesLoadingManager(this.superLoad, this.load);
         //initialize frame event of scripting API
         this.listenToIframeEvents();
 
@@ -503,7 +502,7 @@ export class GameScene extends DirtyScene {
                     `Tilesets must be embedded in a map. The tileset "${tileset.source}" must be embedded in the Tiled map "${this.mapUrlFile}".`
                 );
             }
-            if (typeof tileset.name === "undefined" || typeof tileset.image === "undefined") {
+            if (typeof tileset.name === "undefined" || !("image" in tileset)) {
                 console.warn("Don't know how to handle tileset ", tileset);
                 return;
             }
@@ -620,8 +619,6 @@ export class GameScene extends DirtyScene {
             throw new Error("playerName is not set");
         }
         this.playerName = playerName;
-        this.characterTextureIds = gameManager.getCharacterTextureIds();
-        this.companionTextureId = gameManager.getCompanionTextureId();
 
         this.Map = this.add.tilemap(this.mapUrlFile);
         const mapDirUrl = this.mapUrlFile.substring(0, this.mapUrlFile.lastIndexOf("/"));
@@ -629,6 +626,11 @@ export class GameScene extends DirtyScene {
             if ("source" in tileset) {
                 throw new Error(
                     `Tilesets must be embedded in a map. The tileset "${tileset.source}" must be embedded in the Tiled map "${this.mapUrlFile}".`
+                );
+            }
+            if (!("image" in tileset)) {
+                throw new Error(
+                    `Tilesets made of a collection of images are not supported in WorkAdventure in the Tiled map "${this.mapUrlFile}".`
                 );
             }
             const tilesetImage = this.Map.addTilesetImage(
@@ -807,7 +809,8 @@ export class GameScene extends DirtyScene {
                 }, 0);
             } else if (this.connection === undefined) {
                 // Let's wait 1 second before printing the "connecting" screen to avoid blinking
-                setTimeout(() => {
+                this.hideTimeout = setTimeout(() => {
+                    this.hideTimeout = undefined;
                     if (this.connection === undefined) {
                         try {
                             this.hide();
@@ -902,7 +905,7 @@ export class GameScene extends DirtyScene {
             .connectToRoomSocket(
                 this.roomUrl,
                 this.playerName,
-                this.characterTextureIds,
+                gameManager.getCharacterTextureIds() ?? [],
                 {
                     ...this.startPositionCalculator.startPosition,
                 },
@@ -912,7 +915,7 @@ export class GameScene extends DirtyScene {
                     right: camera.scrollX + camera.width,
                     bottom: camera.scrollY + camera.height,
                 },
-                this.companionTextureId,
+                gameManager.getCompanionTextureId(),
                 get(availabilityStatusStore),
                 this.getGameMap().getLastCommandId()
             )
@@ -1104,6 +1107,9 @@ export class GameScene extends DirtyScene {
                     this.handleCurrentPlayerHasMovedEvent(event);
                 });
 
+                // Set up events manager
+                this.scriptingEventsManager = new ScriptingEventsManager(this.connection);
+
                 // Set up variables manager
                 this.sharedVariablesManager = new SharedVariablesManager(
                     this.connection,
@@ -1161,7 +1167,18 @@ export class GameScene extends DirtyScene {
                     }
                 });
 
-                const broadcastService = new BroadcastService(this.connection);
+                const broadcastService = new BroadcastService(
+                    this.connection,
+                    (
+                        connection: RoomConnection,
+                        spaceName: string,
+                        spaceFilter: SpaceFilterMessage,
+                        broadcastService: BroadcastService,
+                        playSound: boolean
+                    ) => {
+                        return new JitsiBroadcastSpace(connection, spaceName, spaceFilter, broadcastService, playSound);
+                    }
+                );
                 this._broadcastService = broadcastService;
 
                 // The megaphoneSettingsMessageStream is completed in the RoomConnection. No need to unsubscribe.
@@ -1346,7 +1363,7 @@ export class GameScene extends DirtyScene {
         );
 
         this.unsubscribers.push(
-            megaphoneEnabledStore.subscribe((state) => {
+            liveStreamingEnabledStore.subscribe((state) => {
                 this.connection?.emitMegaphoneState(state);
             })
         );
@@ -1354,6 +1371,10 @@ export class GameScene extends DirtyScene {
         const talkIconVolumeTreshold = 10;
         let oldPeersNumber = 0;
         let oldUsers = new Map<number, MessageUserJoined>();
+        let screenWakeRelease: (() => Promise<void>) | undefined;
+
+        let alreadyInBubble = false;
+        const pendingConnects = new Set<number>();
         this.peerStoreUnsubscriber = peerStore.subscribe((peers) => {
             const newPeerNumber = peers.size;
             const newUsers = new Map<number, MessageUserJoined>();
@@ -1368,12 +1389,31 @@ export class GameScene extends DirtyScene {
 
             // Join
             if (oldPeersNumber === 0 && newPeerNumber > oldPeersNumber) {
-                iframeListener.sendJoinProximityMeetingEvent(Array.from(newUsers.values()));
+                // Note: by design, the peerStore can only add or remove one user at a given time.
+                // So we know for sure that there is only one new user.
+                const peer = Array.from(peers.values())[0];
+                pendingConnects.add(peer.userId);
+                peer.once("connect", () => {
+                    pendingConnects.delete(peer.userId);
+                    if (pendingConnects.size === 0) {
+                        iframeListener.sendJoinProximityMeetingEvent(Array.from(newUsers.values()));
+                        alreadyInBubble = true;
+                    }
+                });
             }
 
             // Left
             if (newPeerNumber === 0 && newPeerNumber < oldPeersNumber) {
+                // TODO: leave event can be triggered without a join if connect fails
                 iframeListener.sendLeaveProximityMeetingEvent();
+
+                if (screenWakeRelease) {
+                    screenWakeRelease()
+                        .then(() => {
+                            screenWakeRelease = undefined;
+                        })
+                        .catch((error) => console.error(error));
+                }
             }
 
             // Participant Join
@@ -1381,7 +1421,23 @@ export class GameScene extends DirtyScene {
                 const newUser = Array.from(newUsers.values()).find((player) => !oldUsers.get(player.userId));
 
                 if (newUser) {
-                    iframeListener.sendParticipantJoinProximityMeetingEvent(newUser);
+                    if (alreadyInBubble) {
+                        peers.get(newUser.userId)?.once("connect", () => {
+                            iframeListener.sendParticipantJoinProximityMeetingEvent(newUser);
+                        });
+                    } else {
+                        const peer = peers.get(newUser.userId);
+                        if (peer) {
+                            pendingConnects.add(newUser.userId);
+                            peer.once("connect", () => {
+                                pendingConnects.delete(newUser.userId);
+                                if (pendingConnects.size === 0) {
+                                    iframeListener.sendJoinProximityMeetingEvent(Array.from(newUsers.values()));
+                                    alreadyInBubble = true;
+                                }
+                            });
+                        }
+                    }
                 }
             }
 
@@ -1390,6 +1446,7 @@ export class GameScene extends DirtyScene {
                 const oldUser = Array.from(oldUsers.values()).find((player) => !newUsers.get(player.userId));
 
                 if (oldUser) {
+                    // TODO: leave event can be triggered without a join if connect fails
                     iframeListener.sendParticipantLeaveProximityMeetingEvent(oldUser);
                 }
             }
@@ -1656,7 +1713,7 @@ ${escapedMessage}
 
         this.iframeSubscriptionList.push(
             iframeListener.addPersonnalMessageStream.subscribe((text) => {
-                iframeListener.sendUserInputChat(text);
+                iframeListener.sendUserInputChat(text, undefined);
                 _newChatMessageSubject.next(text);
             })
         );
@@ -1933,7 +1990,9 @@ ${escapedMessage}
             // for the connection to send back the answer.
             await this.connectionAnswerPromiseDeferred.promise;
             return {
+                playerId: this.connection?.getUserId(),
                 mapUrl: this.mapUrlFile,
+                hashParameters: urlManager.getHashParameters(),
                 startLayerName: this.startPositionCalculator.getStartPositionName() ?? undefined,
                 uuid: localUserStore.getLocalUser()?.uuid,
                 nickname: this.playerName,
@@ -2199,6 +2258,11 @@ ${escapedMessage}
             }
             scriptUtils.goToPage("/login");
         });
+
+        iframeListener.registerAnswerer("playSoundInBubble", async (message) => {
+            const soundUrl = new URL(message.url, this.mapUrlFile);
+            await this.simplePeer.dispatchSound(soundUrl);
+        });
     }
 
     private setPropertyLayer(
@@ -2360,8 +2424,10 @@ ${escapedMessage}
         iframeListener.unregisterAnswerer("closeUIWebsite");
         iframeListener.unregisterAnswerer("enablePlayersTracking");
         iframeListener.unregisterAnswerer("goToLogin");
+        iframeListener.unregisterAnswerer("playSoundInBubble");
         this.sharedVariablesManager?.close();
         this.playerVariablesManager?.close();
+        this.scriptingEventsManager?.close();
         this.embeddedWebsiteManager?.close();
         this.areaManager?.close();
         this.playersEventDispatcher.cleanup();
@@ -2385,6 +2451,10 @@ ${escapedMessage}
         gameSceneIsLoadedStore.set(false);
         gameSceneStore.set(undefined);
         this.cleanupDone = true;
+        if (this.hideTimeout) {
+            clearTimeout(this.hideTimeout);
+            this.hideTimeout = undefined;
+        }
     }
 
     private removeAllRemotePlayers(): void {
@@ -2464,20 +2534,39 @@ ${escapedMessage}
         }
     }
 
+    /**
+     * Analyze the #moveTo parameter in the URL.
+     * This function will try to move the player
+     *
+     * - to the X,Y coordinates if this is X,Y coordinates
+     * - if not, to the WAM area with the given name
+     * - if not found, to the Tiled area with the given name
+     * - if not found, to the Tiled layer with the given name
+     */
     private tryMovePlayerWithMoveToParameter(): void {
         const moveToParam = urlManager.getHashParameter("moveTo");
         if (moveToParam) {
             try {
-                let endPos;
+                let endPos: { x: number; y: number };
                 const posFromParam = StringUtils.parsePointFromParam(moveToParam);
                 if (posFromParam) {
                     endPos = this.gameMapFrontWrapper.getTileIndexAt(posFromParam.x, posFromParam.y);
                 } else {
-                    const destinationObject = this.gameMapFrontWrapper.getObjectWithName(moveToParam);
-                    if (destinationObject) {
-                        endPos = this.gameMapFrontWrapper.getTileIndexAt(destinationObject.x, destinationObject.y);
+                    // First, try by id
+                    let areaData = this.gameMapFrontWrapper.getAreas()?.get(moveToParam);
+                    if (!areaData) {
+                        areaData = this.gameMapFrontWrapper.getAreaByName(moveToParam);
+                    }
+                    if (areaData) {
+                        const pixelEndPos = MathUtils.randomPositionFromRect(areaData);
+                        endPos = this.gameMapFrontWrapper.getTileIndexAt(pixelEndPos.x, pixelEndPos.y);
                     } else {
-                        endPos = this.gameMapFrontWrapper.getRandomPositionFromLayer(moveToParam);
+                        const destinationObject = this.gameMapFrontWrapper.getObjectWithName(moveToParam);
+                        if (destinationObject) {
+                            endPos = this.gameMapFrontWrapper.getTileIndexAt(destinationObject.x, destinationObject.y);
+                        } else {
+                            endPos = this.gameMapFrontWrapper.getRandomPositionFromLayer(moveToParam);
+                        }
                     }
                 }
 
@@ -2608,7 +2697,7 @@ ${escapedMessage}
                 this.currentPlayerTexturesPromise,
                 PositionMessage_Direction.DOWN,
                 false,
-                this.companionTextureId ? this.currentCompanionTexturePromise : undefined
+                gameManager.getCompanionTextureId() ? this.currentCompanionTexturePromise : undefined
             );
             this.CurrentPlayer.on(Phaser.Input.Events.POINTER_OVER, (pointer: Phaser.Input.Pointer) => {
                 this.CurrentPlayer.pointerOverOutline(0x365dff);
@@ -2842,17 +2931,6 @@ ${escapedMessage}
         player.on(Phaser.Input.Events.POINTER_OUT, () => {
             this.activatablesManager.handlePointerOutActivatableObject();
             this.markDirty();
-        });
-
-        player.on(RemotePlayerEvent.Clicked, () => {
-            const userFound = this.remotePlayersRepository.getPlayers().get(player.userId);
-
-            if (!userFound) {
-                console.error("Undefined clicked player!");
-                return;
-            }
-
-            iframeListener.sendRemotePlayerClickedEvent(userFound);
         });
     }
 

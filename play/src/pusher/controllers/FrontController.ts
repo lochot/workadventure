@@ -14,7 +14,7 @@ import { BaseHttpController } from "./BaseHttpController";
 export class FrontController extends BaseHttpController {
     private indexFile: string;
     private redirectToAdminFile: string;
-    private script: string;
+    private script: Promise<string> | undefined;
 
     constructor(protected app: Server, protected liveAssets: LiveDirectory) {
         super(app);
@@ -46,8 +46,21 @@ export class FrontController extends BaseHttpController {
 
         // Pre-parse the index file for speed (and validation)
         Mustache.parse(this.indexFile);
+    }
 
-        this.script = "window.env = " + JSON.stringify(FRONT_ENVIRONMENT_VARIABLES);
+    private async getScript() {
+        if (this.script) {
+            return this.script;
+        }
+        this.script = adminService.getCapabilities().then((capabilities) => {
+            return (
+                "window.env = " +
+                JSON.stringify(FRONT_ENVIRONMENT_VARIABLES) +
+                "\nwindow.capabilities = " +
+                JSON.stringify(capabilities)
+            );
+        });
+        return this.script;
     }
 
     routes(): void {
@@ -151,23 +164,33 @@ export class FrontController extends BaseHttpController {
             async (req: Request, res: Response) => {
                 try {
                     const response = await adminService.fetchWellKnownChallenge(req.hostname);
-                    return res.status(200).send(response);
+                    res.atomic(() => {
+                        res.status(200).send(response);
+                    });
+                    return;
                 } catch (e) {
                     Sentry.captureException(e);
                     console.error(e);
-                    return res.status(526).send("Fail on challenging hostname");
+                    res.atomic(() => {
+                        res.status(526).send("Fail on challenging hostname");
+                    });
+                    return;
                 }
             }
         );
 
         this.app.get("/server.json", (req: Request, res: Response) => {
-            return res.json({
-                domain: process.env.PUSHER_URL,
-                name: process.env.SERVER_NAME || "WorkAdventure Server",
-                motd: process.env.SERVER_MOTD || "A WorkAdventure Server",
-                icon: process.env.SERVER_ICON || process.env.PUSHER_URL + "/static/images/favicons/icon-512x512.png",
-                version: version + (process.env.NODE_ENV !== "production" ? "-dev" : ""),
+            res.atomic(() => {
+                res.json({
+                    domain: process.env.PUSHER_URL,
+                    name: process.env.SERVER_NAME || "WorkAdventure Server",
+                    motd: process.env.SERVER_MOTD || "A WorkAdventure Server",
+                    icon:
+                        process.env.SERVER_ICON || process.env.PUSHER_URL + "/static/images/favicons/icon-512x512.png",
+                    version: version + (process.env.NODE_ENV !== "production" ? "-dev" : ""),
+                });
             });
+            return;
         });
 
         this.app.get("/*", (req: Request, res: Response) => {
@@ -180,7 +203,9 @@ export class FrontController extends BaseHttpController {
                 req.path.startsWith("/node_modules") ||
                 req.path.startsWith("/@fs/")
             ) {*/
-                res.status(303).redirect(`${VITE_URL}${decodeURI(req.path)}`);
+                res.atomic(() => {
+                    res.status(303).redirect(`${VITE_URL}${decodeURI(req.path)}`);
+                });
                 return;
             }
 
@@ -189,24 +214,28 @@ export class FrontController extends BaseHttpController {
             const file = this.liveAssets.get(decodeURI(filePath));
 
             if (!file) {
-                res.status(404).send("404 Page not found");
+                res.atomic(() => {
+                    res.status(404).send("404 Page not found");
+                });
                 return;
             }
 
-            if (filePath.startsWith("/assets")) {
-                const date = new Date();
-                date.setFullYear(date.getFullYear() + 1);
-                res.header("expires", date.toUTCString());
-                res.header("cache-control", "public");
-            }
-            if (filePath.startsWith("/resources") || filePath.startsWith("/static")) {
-                const date = new Date();
-                date.setDate(date.getDate() + 1);
-                res.header("expires", date.toUTCString());
-                res.header("cache-control", "public");
-            }
+            res.atomic(() => {
+                if (filePath.startsWith("/assets")) {
+                    const date = new Date();
+                    date.setFullYear(date.getFullYear() + 1);
+                    res.header("expires", date.toUTCString());
+                    res.header("cache-control", "public");
+                }
+                if (filePath.startsWith("/resources") || filePath.startsWith("/static")) {
+                    const date = new Date();
+                    date.setDate(date.getDate() + 1);
+                    res.header("expires", date.toUTCString());
+                    res.header("cache-control", "public");
+                }
 
-            res.type(file.extension).header("etag", file.etag).send(file.buffer);
+                res.type(file.extension).header("etag", file.etag).send(file.buffer);
+            });
             return;
         });
     }
@@ -224,20 +253,30 @@ export class FrontController extends BaseHttpController {
         }
 
         if (redirectUrl) {
-            return res.redirect(redirectUrl);
+            const redirect = redirectUrl;
+            res.atomic(() => {
+                res.redirect(redirect);
+            });
+            return;
         }
 
         // Read the access_key from the query parameter. If it is set, redirect to the admin to attempt a login.
         const accessKey = req.query.access_key;
         if (accessKey && typeof accessKey === "string" && accessKey.length > 0) {
             if (!ADMIN_URL) {
-                return res.status(400).send("ADMIN_URL is not configured.");
+                res.atomic(() => {
+                    res.status(400).send("ADMIN_URL is not configured.");
+                });
+                return;
             }
             const html = Mustache.render(this.redirectToAdminFile, {
                 accessKey,
                 ADMIN_URL,
             });
-            return res.type("html").send(html);
+            res.atomic(() => {
+                res.type("html").send(html);
+            });
+            return;
         }
 
         // get auth token from post /authToken
@@ -259,7 +298,7 @@ export class FrontController extends BaseHttpController {
                 // TODO change it to push data from admin
                 msApplicationTileImage: metaTagsData.favIcons[metaTagsData.favIcons.length - 1].src,
                 url,
-                script: this.script,
+                script: await this.getScript(),
                 authToken: authToken,
                 ...option,
             });
@@ -267,7 +306,10 @@ export class FrontController extends BaseHttpController {
             console.info(`Cannot render metatags on ${url}`, e);
         }
 
-        return res.type("html").send(html);
+        res.atomic(() => {
+            res.type("html").send(html);
+        });
+        return;
     }
 
     private async displayManifestJson(req: Request, res: Response, url: string) {
@@ -316,6 +358,9 @@ export class FrontController extends BaseHttpController {
             ],
         };
 
-        return res.json(manifest);
+        res.atomic(() => {
+            res.json(manifest);
+        });
+        return;
     }
 }
