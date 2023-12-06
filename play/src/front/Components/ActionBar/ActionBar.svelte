@@ -831,8 +831,9 @@
                         </button>
                     </div>
                 {/if}
+                <!--
                 {#if $userHasAccessToBackOfficeStore}
-                    <!-- svelte-ignore a11y-click-events-have-key-events -->
+                   
                     <div
                         on:dragstart|preventDefault={noDrag}
                         on:click={() => analyticsClient.openBackOffice()}
@@ -846,6 +847,7 @@
                         </button>
                     </div>
                 {/if}
+            -->
             </div>
 
             {#if $addActionButtonActionBarEvent.length > 0}
@@ -882,9 +884,8 @@
                     {/each}
                 </div>
             {/if}
+            {#if $inviteUserActivated && 1 == 0}
 
-            {#if $inviteUserActivated}
-                <!-- svelte-ignore a11y-click-events-have-key-events -->
                 <div
                     class="bottom-action-section tw-flex tw-flex-initial"
                     in:fly={{}}
@@ -897,11 +898,11 @@
                         id="invite-btn"
                         class:border-top-light={$menuVisiblilityStore}
                     >
-                        {$LL.menu.sub.invite()}
+                        {$LL.menu.sub.invite()} - ---
                     </button>
                 </div>
             {/if}
-
+            -->
             <!-- TODO button must displayed by scripting API -->
             <!--
 			{#if ENABLE_OPENID && !$userIsConnected && }
