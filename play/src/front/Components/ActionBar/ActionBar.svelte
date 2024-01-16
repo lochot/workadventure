@@ -902,7 +902,7 @@
                     </button>
                 </div>
             {/if}
-            -->
+            
             <!-- TODO button must displayed by scripting API -->
             <!--
 			{#if ENABLE_OPENID && !$userIsConnected && }
