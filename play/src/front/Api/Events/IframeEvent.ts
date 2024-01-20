@@ -1,6 +1,13 @@
 import { z } from "zod";
-import { KLAXOON_ACTIVITY_PICKER_EVENT, isKlaxoonEvent } from "@workadventure/shared-utils";
-import { isChatEvent, isChatMessage } from "./ChatEvent";
+import {
+    KLAXOON_ACTIVITY_PICKER_EVENT,
+    isBanEvent,
+    isKlaxoonEvent,
+    isXmppSettingsMessageEvent,
+} from "@workadventure/shared-utils";
+import { isStartWritingEvent, isStopWritingEvent } from "@workadventure/shared-utils/src/Events/WritingEvent";
+import { isUpdateWritingStatusChatListEvent } from "@workadventure/shared-utils/src/Events/UpdateWritingStatusChatListEvent";
+import { isChatEvent, isChatMessage } from "../../../../../libs/shared-utils/src/Events/ChatEvent";
 import { isClosePopupEvent } from "./ClosePopupEvent";
 import { isGoToPageEvent } from "./GoToPageEvent";
 import { isLoadPageEvent } from "./LoadPageEvent";
@@ -54,9 +61,12 @@ import { isChatVisibilityEvent } from "./ChatVisibilityEvent";
 import { isNotificationEvent } from "./NotificationEvent";
 import { isShowBusinessCardEvent } from "./ShowBusinessCardEvent";
 import { isModalEvent } from "./ModalEvent";
-import { isXmppSettingsMessageEvent } from "./XmppSettingsMessageEvent";
 import { isAddButtonActionBarEvent, isRemoveButtonActionBarEvent } from "./Ui/ButtonActionBarEvent";
 import { isBannerEvent } from "./Ui/BannerEvent";
+import { isTeleportPlayerToEventConfig } from "./TeleportPlayerToEvent";
+import { isSendEventEvent } from "./SendEventEvent";
+import { isReceiveEventEvent } from "./ReceiveEventEvent";
+import { isPlaySoundInBubbleEvent } from "./ProximityMeeting/PlaySoundInBubbleEvent";
 
 export interface TypedMessageEvent<T> extends MessageEvent {
     data: T;
@@ -81,6 +91,14 @@ export const isIframeEventWrapper = z.union([
     z.object({
         type: z.literal("chat"),
         data: isChatEvent,
+    }),
+    z.object({
+        type: z.literal("startWriting"),
+        data: isStartWritingEvent,
+    }),
+    z.object({
+        type: z.literal("stopWriting"),
+        data: isStopWritingEvent,
     }),
     z.object({
         type: z.literal("openChat"),
@@ -299,6 +317,10 @@ export const isIframeEventWrapper = z.union([
         type: z.literal(KLAXOON_ACTIVITY_PICKER_EVENT),
         payload: isKlaxoonEvent,
     }),
+    z.object({
+        type: z.literal("banUser"),
+        data: isBanEvent,
+    }),
 ]);
 
 export type IframeEvent = z.infer<typeof isIframeEventWrapper>;
@@ -385,6 +407,10 @@ export const isIframeResponseEvent = z.union([
         data: isSetSharedPlayerVariableEvent,
     }),
     z.object({
+        type: z.literal("receiveEvent"),
+        data: isReceiveEventEvent,
+    }),
+    z.object({
         type: z.literal("messageTriggered"),
         data: isMessageReferenceEvent,
     }),
@@ -440,7 +466,7 @@ export const isIframeResponseEvent = z.union([
     }),
     z.object({
         type: z.literal("updateWritingStatusChatList"),
-        data: z.array(z.nullable(z.string())),
+        data: isUpdateWritingStatusChatListEvent,
     }),
     z.object({
         type: z.literal("buttonActionBarTrigger"),
@@ -449,6 +475,10 @@ export const isIframeResponseEvent = z.union([
     z.object({
         type: z.literal("modalCloseTrigger"),
         data: isModalEvent,
+    }),
+    z.object({
+        type: z.literal("banUser"),
+        data: isBanEvent,
     }),
 ]);
 export type IframeResponseEvent = z.infer<typeof isIframeResponseEvent>;
@@ -478,6 +508,10 @@ export const iframeQueryMapTypeGuards = {
     },
     setPlayerVariable: {
         query: isSetPlayerVariableEvent,
+        answer: z.undefined(),
+    },
+    dispatchEvent: {
+        query: isSendEventEvent,
         answer: z.undefined(),
     },
     loadTileset: {
@@ -556,6 +590,10 @@ export const iframeQueryMapTypeGuards = {
         query: isMovePlayerToEventConfig,
         answer: isMovePlayerToEventAnswer,
     },
+    teleportPlayerTo: {
+        query: isTeleportPlayerToEventConfig,
+        answer: z.undefined(),
+    },
     openUIWebsite: {
         query: isCreateUIWebsiteEvent,
         answer: isUIWebsiteEvent,
@@ -579,6 +617,10 @@ export const iframeQueryMapTypeGuards = {
     getWoka: {
         query: z.undefined(),
         answer: z.string(),
+    },
+    playSoundInBubble: {
+        query: isPlaySoundInBubbleEvent,
+        answer: z.undefined(),
     },
 };
 

@@ -8,6 +8,8 @@ import { jitsiExternalApiFactory } from "../JitsiExternalApiFactory";
 import { requestedCameraState, requestedMicrophoneState } from "../../Stores/MediaStore";
 import { jitsiParticipantsCountStore, userIsJitsiDominantSpeakerStore } from "../../Stores/GameStore";
 import { gameManager } from "../../Phaser/Game/GameManager";
+import { currentPlayerWokaStore } from "../../Stores/CurrentPlayerWokaStore";
+import { screenWakeLock } from "../../Utils/ScreenWakeLock";
 import { SimpleCoWebsite } from "./SimpleCoWebsite";
 
 const JitsiConfig = z
@@ -16,6 +18,12 @@ const JitsiConfig = z
         startWithVideoMuted: z.boolean().optional(),
         prejoinPageEnabled: z.boolean().optional(),
         disableDeepLinking: z.boolean().optional(),
+        gravatar: z
+            .object({
+                baseUrl: z.string().optional(),
+                disabled: z.boolean().optional(),
+            })
+            .optional(),
     })
     .passthrough();
 
@@ -52,6 +60,9 @@ const getDefaultConfig = (): JitsiConfig => {
         startWithVideoMuted: !get(requestedCameraState),
         prejoinPageEnabled: false,
         disableDeepLinking: false,
+        gravatar: {
+            disabled: true,
+        },
     };
 };
 
@@ -126,10 +137,10 @@ export class JitsiCoWebsite extends SimpleCoWebsite {
     private dominantSpeakerChangedCallback = this.onDominantSpeakerChanged.bind(this);
     private participantsCountChangeCallback = this.onParticipantsCountChange.bind(this);
 
+    private screenWakeRelease: (() => Promise<void>) | undefined;
+
     constructor(
         url: URL,
-        allowApi: boolean | undefined,
-        allowPolicy: string | undefined,
         widthPercent: number | undefined,
         closable: boolean | undefined,
         private roomName: string,
@@ -139,7 +150,7 @@ export class JitsiCoWebsite extends SimpleCoWebsite {
         private jitsiInterfaceConfig: object | undefined,
         private domain: string
     ) {
-        super(url, allowApi, allowPolicy, widthPercent, closable);
+        super(url, false, undefined, widthPercent, closable);
     }
 
     private loadPromise: CancelablePromise | undefined;
@@ -185,6 +196,16 @@ export class JitsiCoWebsite extends SimpleCoWebsite {
 
                         this.jitsiApi.addListener("videoConferenceJoined", () => {
                             this.jitsiApi?.executeCommand("displayName", this.playerName);
+                            this.jitsiApi?.executeCommand("avatarUrl", get(currentPlayerWokaStore));
+                            this.jitsiApi?.executeCommand("setNoiseSuppressionEnabled", {
+                                enabled: window.navigator.userAgent.toLowerCase().indexOf("firefox") === -1,
+                            });
+
+                            screenWakeLock
+                                .requestWakeLock()
+                                .then((release) => (this.screenWakeRelease = release))
+                                .catch((error) => console.error(error));
+
                             this.updateParticipantsCountStore();
                         });
 
@@ -246,6 +267,13 @@ export class JitsiCoWebsite extends SimpleCoWebsite {
     }
 
     private closeOrUnload() {
+        if (this.screenWakeRelease) {
+            this.screenWakeRelease()
+                .then(() => {
+                    this.screenWakeRelease = undefined;
+                })
+                .catch((error) => console.error(error));
+        }
         if (this.isClosable()) {
             coWebsiteManager.closeCoWebsite(this);
         } else {
@@ -261,11 +289,16 @@ export class JitsiCoWebsite extends SimpleCoWebsite {
         } else {
             console.log("CLOSING NOOOOT unload JitsiCoWebsite");
         }
-        this.loadPromise?.cancel();
-        this.destroy();
-        inExternalServiceStore.set(false);
+        try {
+            this.loadPromise?.cancel();
+            this.destroy();
+            inExternalServiceStore.set(false);
 
-        return super.unload();
+            return super.unload();
+        } catch (e) {
+            console.error("Cannot unload Jitsi co-website", e);
+            return Promise.reject(e);
+        }
     }
 
     public stop() {

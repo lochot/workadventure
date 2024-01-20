@@ -7,6 +7,7 @@ import {
     toBool,
     toNumber,
     toArray,
+    emptyStringToUndefined,
 } from "@workadventure/shared-utils/src/EnvironmentVariables/EnvironmentVariableUtils";
 
 export const EnvironmentVariables = z.object({
@@ -29,7 +30,16 @@ export const EnvironmentVariables = z.object({
     // Use "*" to allow any domain
     ALLOWED_CORS_ORIGIN: z.string().url().or(z.literal("*")).optional(),
     PUSHER_URL: AbsoluteOrRelativeUrl.optional(),
-    PUBLIC_MAP_STORAGE_URL: z.string().url().optional(),
+    FRONT_URL: AbsoluteOrRelativeUrl.optional(),
+    PUBLIC_MAP_STORAGE_URL: z
+        .string()
+        .url()
+        .optional()
+        .transform(emptyStringToUndefined)
+        .describe('The public URL to the map-storage server (for instance: "https://map-storage.example.com"'),
+    INTERNAL_MAP_STORAGE_URL: AbsoluteOrRelativeUrl.optional()
+        .transform(emptyStringToUndefined)
+        .describe('The internal URL to the map-storage server (for instance: "https://map-storage:3000"'),
     OPID_CLIENT_ID: z.string().optional(),
     OPID_CLIENT_SECRET: z.string().optional(),
     OPID_CLIENT_ISSUER: z.string().optional(),
@@ -38,7 +48,6 @@ export const EnvironmentVariables = z.object({
     OPID_PROMPT: z.string().optional(),
     OPID_USERNAME_CLAIM: z.string().optional(),
     OPID_LOCALE_CLAIM: z.string().optional(),
-    OPID_LOGOUT_REDIRECT_URL: z.string().optional(),
     USERNAME_POLICY: z.string().optional(),
     DISABLE_ANONYMOUS: BoolAsString.optional().transform((val) => toBool(val, false)),
     PROMETHEUS_AUTHORIZATION_TOKEN: z.string().optional(),
@@ -103,15 +112,15 @@ export const EnvironmentVariables = z.object({
     JITSI_DOMAIN: z.string().optional(),
     JITSI_XMPP_DOMAIN: z.string().optional(),
     JITSI_MUC_DOMAIN: z.string().optional(),
-    MAP_STORAGE_PATH_PREFIX: z.string().optional(),
     KLAXOON_ENABLED: BoolAsString.optional().transform((val) => toBool(val, false)),
     KLAXOON_CLIENT_ID: z.string().optional(),
     YOUTUBE_ENABLED: BoolAsString.optional().transform((val) => toBool(val, false)),
+    GOOGLE_DRIVE_ENABLED: BoolAsString.optional().transform((val) => toBool(val, false)),
     GOOGLE_DOCS_ENABLED: BoolAsString.optional().transform((val) => toBool(val, false)),
     GOOGLE_SHEETS_ENABLED: BoolAsString.optional().transform((val) => toBool(val, false)),
     GOOGLE_SLIDES_ENABLED: BoolAsString.optional().transform((val) => toBool(val, false)),
     ERASER_ENABLED: BoolAsString.optional().transform((val) => toBool(val, false)),
-    WHITE_LISTE_EMBEDAABLE_DOMAINS: z
+    EMBEDDED_DOMAINS_WHITELIST: z
         .string()
         .optional()
         .transform((val) => toArray(val)),
@@ -121,6 +130,10 @@ export const EnvironmentVariables = z.object({
     PEER_VIDEO_RECOMMENDED_BANDWIDTH: PositiveIntAsString.optional(),
     PEER_SCREEN_SHARE_LOW_BANDWIDTH: PositiveIntAsString.optional(),
     PEER_SCREEN_SHARE_RECOMMENDED_BANDWIDTH: PositiveIntAsString.optional(),
+    // Google drive ouath for picker
+    GOOGLE_DRIVE_PICKER_CLIENT_ID: z.string().optional(),
+    GOOGLE_DRIVE_PICKER_API_KEY: z.string().optional(),
+    GOOGLE_DRIVE_PICKER_APP_ID: z.string().optional(),
 });
 
 export type EnvironmentVariables = z.infer<typeof EnvironmentVariables>;

@@ -13,7 +13,7 @@ import * as _ from "lodash";
 import { SimpleCoWebsite } from "../../WebRtc/CoWebsite/SimpleCoWebsite";
 import { coWebsiteManager } from "../../WebRtc/CoWebsiteManager";
 import { ActionsMenuAction, actionsMenuStore } from "../../Stores/ActionsMenuStore";
-import { mapEditorModeStore, mapEditorEntityModeStore } from "../../Stores/MapEditorStore";
+import { mapEditorModeStore } from "../../Stores/MapEditorStore";
 import { createColorStore } from "../../Stores/OutlineColorStore";
 import { ActivatableInterface } from "../Game/ActivatableInterface";
 import { GameScene } from "../Game/GameScene";
@@ -104,9 +104,19 @@ export class Entity extends Phaser.GameObjects.Image implements ActivatableInter
     }
 
     public activate(): void {
-        if (!(get(mapEditorModeStore) && get(mapEditorEntityModeStore) === "EDIT")) {
-            this.toggleActionsMenu();
+        if (get(mapEditorModeStore)) {
+            actionsMenuStore.clear();
+            return;
         }
+
+        /*        const editorMode = get(mapEditorEntityModeStore);
+
+        if (editorMode !== "EDIT") {
+            actionsMenuStore.clear();
+            return;
+        }*/
+
+        this.toggleActionsMenu();
     }
 
     public deactivate(): void {
@@ -169,7 +179,7 @@ export class Entity extends Phaser.GameObjects.Image implements ActivatableInter
         this.outlineColorStore.characterFarAway();
     }
 
-    public getCurrentOutline(): { thickness: number; color?: number } {
+    private getCurrentOutline(): { thickness: number; color?: number } {
         return { thickness: 2, color: get(this.outlineColorStore) };
     }
 
@@ -271,7 +281,13 @@ export class Entity extends Phaser.GameObjects.Image implements ActivatableInter
                                     propertyValue: link,
                                 });
                             } else {
-                                const coWebsite = new SimpleCoWebsite(new URL(link));
+                                const coWebsite = new SimpleCoWebsite(
+                                    new URL(link),
+                                    property.allowAPI,
+                                    property.policy,
+                                    property.width,
+                                    property.closable
+                                );
                                 coWebsiteManager.addCoWebsiteToStore(coWebsite, undefined);
                                 coWebsiteManager.loadCoWebsite(coWebsite).catch(() => {
                                     console.error("Error during loading a co-website: " + coWebsite.getUrl());
@@ -293,7 +309,8 @@ export class Entity extends Phaser.GameObjects.Image implements ActivatableInter
                                 propertyName: GameMapProperties.PLAY_AUDIO,
                                 propertyValue: audioLink,
                             });
-                            actionsMenuStore.clear();
+                            // Fixme: close the menu without impact audio manager and playing
+                            //actionsMenuStore.clear();
                         },
                     });
                     break;

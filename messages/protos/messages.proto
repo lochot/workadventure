@@ -2,6 +2,7 @@ syntax = "proto3";
 
 import "google/protobuf/wrappers.proto";
 import "google/protobuf/struct.proto";
+import "google/protobuf/any.proto";
 
 /*********** PARTIAL MESSAGES **************/
 
@@ -94,6 +95,11 @@ message ReportPlayerMessage {
   string reportComment = 2;
 }
 
+message BanPlayerMessage {
+  string banUserUuid = 1;
+  string banUserName = 2;
+}
+
 message EmotePromptMessage {
   string emote = 2;
 }
@@ -119,6 +125,11 @@ message FollowAbortMessage {
 
 message LockGroupPromptMessage {
   bool lock = 1;
+}
+
+message KickOffUserMessage {
+  string userId = 1;
+  string spaceName = 2;
 }
 
 /*********** MAP EDITOR MESSAGES *************/
@@ -246,9 +257,21 @@ message ClientToServerMessage {
     MegaphoneStateMessage megaphoneStateMessage = 32;
     ScreenSharingStateMessage screenSharingStateMessage = 33;
     JitsiParticipantIdSpaceMessage  jitsiParticipantIdSpaceMessage = 34;
+    UpdateSpaceMetadataMessage updateSpaceMetadataMessage = 35;
+    KickOffUserMessage kickOffUserMessage = 36;
+    MuteParticipantIdMessage muteParticipantIdMessage = 37;
+    MuteEveryBodyParticipantMessage muteEveryBodyParticipantMessage = 38;
+    MuteVideoParticipantIdMessage muteVideoParticipantIdMessage = 39;
+    MuteVideoEveryBodyParticipantMessage muteVideoEveryBodyParticipantMessage = 40;
+    BanPlayerMessage banPlayerMessage = 41;
   }
 }
 
+message ReceivedEventMessage {
+  string name = 1;
+  google.protobuf.Value data = 2;
+  optional int32 senderId = 3;
+}
 
 /************ BI-DIRECTIONAL MESSAGES **************/
 
@@ -309,6 +332,8 @@ message QueryMessage {
     JoinBBBMeetingQuery joinBBBMeetingQuery = 20;
     RoomTagsQuery roomTagsQuery = 3;
     EmbeddableWebsiteQuery embeddableWebsiteQuery = 4;
+    RoomsFromSameWorldQuery roomsFromSameWorldQuery = 5;
+    SendEventQuery sendEventQuery = 6;
   }
 }
 
@@ -331,6 +356,14 @@ message EmbeddableWebsiteQuery {
   string url = 1;
 }
 
+message RoomsFromSameWorldQuery {
+}
+
+message SendEventQuery {
+  string name = 1;
+  google.protobuf.Value data = 2;
+  repeated int32 targetUserIds = 3;
+}
 
 message AnswerMessage {
   int32 id = 1;
@@ -340,6 +373,8 @@ message AnswerMessage {
     JoinBBBMeetingAnswer joinBBBMeetingAnswer = 4;
     RoomTagsAnswer roomTagsAnswer = 5;
     EmbeddableWebsiteAnswer embeddableWebsiteAnswer = 6;
+    RoomsFromSameWorldAnswer roomsFromSameWorldAnswer = 7;
+    SendEventAnswer sendEventAnswer = 8;
   }
 }
 
@@ -362,6 +397,19 @@ message EmbeddableWebsiteAnswer {
   bool state = 2;
   bool embeddable = 3;
   optional string message = 4;
+}
+
+message RoomShortDescription {
+  string name = 1;
+  string roomUrl = 2;
+  optional string wamUrl = 3;
+}
+
+message RoomsFromSameWorldAnswer {
+  repeated RoomShortDescription roomDescriptions = 1;
+}
+
+message SendEventAnswer {
 }
 
 /*********** SERVER TO CLIENT MESSAGES *************/
@@ -395,6 +443,15 @@ message SubMessage {
     UpdateSpaceUserMessage updateSpaceUserMessage = 17;
     RemoveSpaceUserMessage removeSpaceUserMessage = 18;
     MegaphoneSettings megaphoneSettingsMessage = 19;
+    ReceivedEventMessage receivedEventMessage = 20;
+    UpdateSpaceMetadataMessage updateSpaceMetadataMessage = 21;
+    KickOffMessage kickOffMessage = 22;
+    MuteMicrophoneMessage muteMicrophoneMessage = 23;
+    MuteVideoMessage muteVideoMessage = 24;
+    MuteMicrophoneEverybodyMessage muteMicrophoneEverybodyMessage = 25;
+    MuteVideoEverybodyMessage muteVideoEverybodyMessage = 26;
+    AskMuteMicrophoneMessage askMuteMicrophoneMessage = 27;
+    AskMuteVideoMessage askMuteVideoMessage = 28;
   }
 }
 
@@ -588,6 +645,45 @@ message MegaphoneEnabledMessage {
   bool value = 1;
 }
 
+message MuteParticipantIdMessage {
+  string spaceName = 1;
+  string mutedUserUuid = 2;
+}
+
+message MuteEveryBodyParticipantMessage {
+  string spaceName = 1;
+  string senderUserId = 2;
+}
+
+message MutedMessage {
+  string userUuid = 1;
+  string message = 2;
+}
+
+message MuteVideoParticipantIdMessage {
+  string spaceName = 1;
+  string mutedUserUuid = 2;
+}
+
+message MuteVideoEveryBodyParticipantMessage {
+  string spaceName = 1;
+  string userId = 2;
+}
+
+message MutedVideoMessage {
+  string userUuid = 1;
+  string message = 2;
+}
+
+message AskMutedMessage {
+  string userUuid = 1;
+  string message = 2;
+}
+
+message AskMutedVideoMessage {
+  string userUuid = 1;
+  string message = 2;
+}
 
 /**
  * Messages going from back and pusher to the front
@@ -621,6 +717,10 @@ message ServerToClientMessage {
     XmppSettingsMessage xmppSettingsMessage = 29;
     MoveToPositionMessage moveToPositionMessage = 31;
     InvalidCompanionTextureMessage invalidCompanionTextureMessage = 32;
+    MutedMessage mutedMessage = 33;
+    MutedVideoMessage mutedVideoMessage = 34;
+    AskMutedMessage askMutedMessage = 35;
+    AskMutedVideoMessage askMutedVideoMessage = 36;
   }
 }
 
@@ -721,6 +821,11 @@ message PusherToBackMessage {
     AskPositionMessage askPositionMessage = 22;
     EditMapCommandMessage editMapCommandMessage = 23;
     PingMessage pingMessage = 24;
+    KickOffUserMessage kickOffUserMessage = 25;
+    MuteParticipantIdMessage muteParticipantIdMessage = 26;
+    MuteEveryBodyParticipantMessage muteEveryBodyParticipantMessage = 27;
+    MuteVideoParticipantIdMessage muteVideoParticipantIdMessage = 28;
+    MuteVideoEveryBodyParticipantMessage muteVideoEveryBodyParticipantMessage = 29;
   }
 }
 
@@ -756,6 +861,7 @@ message SubToPusherRoomMessage {
     EditMapCommandMessage editMapCommandMessage = 3;
     JoinMucRoomMessage joinMucRoomMessage = 4;
     LeaveMucRoomMessage leaveMucRoomMessage = 5;
+    ReceivedEventMessage receivedEventMessage = 6;
   }
 }
 
@@ -854,6 +960,10 @@ message RoomsList {
   repeated RoomDescription roomDescription = 1;
 }
 
+message DispatchGlobalEventRequest {
+  string name = 1;
+  google.protobuf.Value value = 2;
+}
 
 /********************************************************************************
  * Start Chat Messages
@@ -886,14 +996,6 @@ message XmppSettingsMessage{
   string jabberId = 4;
   string jabberPassword = 5;
 }
-
-message BanUserByUuidMessage{
-  string playUri = 1;
-  string uuidToBan = 2;
-  string name = 3;
-  string message = 4;
-  string byUserEmail = 5;
-}
 /*********************************************************************************
  * End Chat Messages
  *********************************************************************************/
@@ -913,6 +1015,14 @@ message PusherToBackSpaceMessage{
     UpdateSpaceUserMessage updateSpaceUserMessage = 4;
     RemoveSpaceUserMessage removeSpaceUserMessage = 5;
     PingMessage pongMessage = 6;
+    UpdateSpaceMetadataMessage updateSpaceMetadataMessage = 7;
+    KickOffMessage kickOffMessage = 8;
+    MuteMicrophoneMessage muteMicrophoneMessage = 9;
+    MuteVideoMessage muteVideoMessage = 10;
+    MuteMicrophoneEverybodyMessage muteMicrophoneEverybodyMessage = 11;
+    MuteVideoEverybodyMessage muteVideoEverybodyMessage = 12;
+    AskMuteMicrophoneMessage askMuteMicrophoneMessage = 13;
+    AskMuteVideoMessage askMuteVideoMessage = 14;
   }
 }
 
@@ -922,6 +1032,14 @@ message BackToPusherSpaceMessage{
     UpdateSpaceUserMessage updateSpaceUserMessage = 2;
     RemoveSpaceUserMessage removeSpaceUserMessage = 3;
     PingMessage pingMessage = 4;
+    UpdateSpaceMetadataMessage updateSpaceMetadataMessage = 5;
+    KickOffMessage kickOffMessage = 6;
+    MuteMicrophoneMessage muteMicrophoneMessage = 7;
+    MuteVideoMessage muteVideoMessage = 8;
+    MuteMicrophoneEverybodyMessage muteMicrophoneEverybodyMessage = 9;
+    MuteVideoEverybodyMessage muteVideoEverybodyMessage = 10;
+    AskMuteMicrophoneMessage askMuteMicrophoneMessage = 11;
+    AskMuteVideoMessage askMuteVideoMessage = 12;
   }
 }
 
@@ -988,8 +1106,46 @@ message RemoveSpaceUserMessage{
   int32 userId = 2;
   google.protobuf.StringValue filterName = 3;
 }
-
-
+message UpdateSpaceMetadataMessage{
+  string spaceName = 1;
+  string metadata = 2;
+  google.protobuf.StringValue filterName = 3;
+}
+message KickOffMessage{
+  string spaceName = 1;
+  string userId = 2;
+  google.protobuf.StringValue filterName = 3;
+}
+message MuteMicrophoneMessage{
+  string spaceName = 1;
+  string userId = 2;
+  google.protobuf.StringValue filterName = 3;
+}
+message MuteVideoMessage{
+  string spaceName = 1;
+  string userId = 2;
+  google.protobuf.StringValue filterName = 3;
+}
+message MuteMicrophoneEverybodyMessage{
+  string spaceName = 1;
+  string userId = 2;
+  google.protobuf.StringValue filterName = 3;
+}
+message MuteVideoEverybodyMessage{
+  string spaceName = 1;
+  string userId = 2;
+  google.protobuf.StringValue filterName = 3;
+}
+message AskMuteMicrophoneMessage{
+  string spaceName = 1;
+  string userId = 2;
+  google.protobuf.StringValue filterName = 3;
+}
+message AskMuteVideoMessage{
+  string spaceName = 1;
+  string userId = 2;
+  google.protobuf.StringValue filterName = 3;
+}
 
 /** Filter **/
 message AddSpaceFilterMessage{
@@ -1020,18 +1176,6 @@ message SpaceFilterLiveStreaming{
 message SpaceFilterEverybody{
 }
 
-message VariableRequest {
-  string room = 1;
-  string name = 2;
-}
-
-message SaveVariableRequest {
-  string room = 1;
-  string name = 2;
-  google.protobuf.Value value = 3;
-
-}
-
 /*
 message Filter {
   enum Operator {
@@ -1049,3 +1193,37 @@ message Filter {
 /*********************************************************************************
  * End Spaces messages
  *********************************************************************************/
+
+
+/* Duplicated events from RoomAPI */
+
+message VariableRequest {
+  string room = 1;
+  string name = 2;
+}
+
+message SaveVariableRequest {
+  string room = 1;
+  string name = 2;
+  google.protobuf.Value value = 3;
+
+}
+
+message EventRequest {
+  string room = 1;
+  string name = 2;
+}
+
+message EventResponse {
+  google.protobuf.Value data = 1;
+  optional int32 senderId = 2;
+}
+
+message DispatchEventRequest {
+  string room = 1;
+  string name = 2;
+  google.protobuf.Value data = 3;
+  // If targetUserIds is empty, the event is broadcast to all users in the room. Otherwise, it targets the users with the given ids.
+  repeated int32 targetUserIds = 4;
+}
+

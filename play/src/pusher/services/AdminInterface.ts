@@ -1,5 +1,7 @@
 import type { MapDetailsData, RoomRedirect, AdminApiData, ErrorApiData } from "@workadventure/messages";
+import { Capabilities } from "@workadventure/messages";
 import type { AdminBannedData, FetchMemberDataByUuidResponse } from "./AdminApi";
+import { ShortMapDescriptionList } from "./ShortMapDescription";
 
 export interface AdminInterface {
     /**
@@ -77,7 +79,7 @@ export interface AdminInterface {
      * @param roomUrl
      * @return string[]
      */
-    getUrlRoomsFromSameWorld(roomUrl: string, locale?: string): Promise<string[]>;
+    getUrlRoomsFromSameWorld(roomUrl: string, locale?: string): Promise<ShortMapDescriptionList>;
 
     /**
      * @param accessToken
@@ -96,8 +98,20 @@ export interface AdminInterface {
         playUri: string,
         name: string,
         message: string,
-        byUserEmail: string
+        byUserUuid: string,
+        byUserEmail?: string
     ): Promise<boolean>;
 
     getTagsList(roomUrl: string): Promise<string[]>;
+
+    /**
+     * Saves the name of the user in the (admin) database
+     */
+    saveName(userIdentifier: string, name: string, roomUrl: string): Promise<void>;
+
+    saveTextures(userIdentifier: string, textures: string[], roomUrl: string): Promise<void>;
+
+    saveCompanionTexture(userIdentifier: string, texture: string, roomUrl: string): Promise<void>;
+
+    getCapabilities(): Promise<Capabilities>;
 }

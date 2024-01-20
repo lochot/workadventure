@@ -41,12 +41,59 @@ const spaceManager = {
                         socketManager.handleUpdateSpaceUserMessage(pusher, message.message.updateSpaceUserMessage);
                         break;
                     }
+                    case "updateSpaceMetadataMessage": {
+                        socketManager.handleUpdateSpaceMetadataMessage(
+                            pusher,
+                            message.message.updateSpaceMetadataMessage
+                        );
+                        break;
+                    }
                     case "removeSpaceUserMessage": {
                         socketManager.handleRemoveSpaceUserMessage(pusher, message.message.removeSpaceUserMessage);
                         break;
                     }
                     case "pongMessage": {
                         pusher.receivedPong();
+                        break;
+                    }
+                    case "kickOffMessage": {
+                        socketManager.handleKickSpaceUserMessage(pusher, message.message.kickOffMessage);
+                        break;
+                    }
+                    case "muteMicrophoneMessage": {
+                        socketManager.handleMuteMicrophoneSpaceUserMessage(
+                            pusher,
+                            message.message.muteMicrophoneMessage
+                        );
+                        break;
+                    }
+                    case "muteVideoMessage": {
+                        socketManager.handleMuteVideoSpaceUserMessage(pusher, message.message.muteVideoMessage);
+                        break;
+                    }
+                    case "muteMicrophoneEverybodyMessage": {
+                        socketManager.handleMuteMicrophoneEverybodySpaceUserMessage(
+                            pusher,
+                            message.message.muteMicrophoneEverybodyMessage
+                        );
+                        break;
+                    }
+                    case "muteVideoEverybodyMessage": {
+                        socketManager.handleMuteVideoEverybodySpaceUserMessage(
+                            pusher,
+                            message.message.muteVideoEverybodyMessage
+                        );
+                        break;
+                    }
+                    case "askMuteMicrophoneMessage": {
+                        socketManager.handleMuteMicrophoneSpaceUserMessage(
+                            pusher,
+                            message.message.askMuteMicrophoneMessage
+                        );
+                        break;
+                    }
+                    case "askMuteVideoMessage": {
+                        socketManager.handleMuteVideoSpaceUserMessage(pusher, message.message.askMuteVideoMessage);
                         break;
                     }
                     default: {

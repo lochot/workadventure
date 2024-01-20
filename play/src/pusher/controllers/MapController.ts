@@ -2,7 +2,6 @@ import { isMapDetailsData } from "@workadventure/messages";
 import { z } from "zod";
 import type { Request, Response } from "hyper-express";
 import { JsonWebTokenError } from "jsonwebtoken";
-import axios from "axios";
 import { DISABLE_ANONYMOUS } from "../enums/EnvironmentVariable";
 import { adminService } from "../services/AdminService";
 import { validateQuery } from "../services/QueryValidator";
@@ -76,25 +75,32 @@ export class MapController extends BaseHttpController {
                     mapDetails.authenticationMandatory = true;
                 }
 
-                res.json(mapDetails);
+                res.atomic(() => {
+                    res.json(mapDetails);
+                });
                 return;
             } catch (error) {
                 if (error instanceof JsonWebTokenError) {
                     console.warn("Invalid token received", error);
-                    res.status(401);
-                    res.send("The Token is invalid");
+                    res.atomic(() => {
+                        res.status(401);
+                        res.send("The Token is invalid");
+                    });
                     return;
-                } else if (axios.isAxiosError(error)) {
+                } /* else if (isAxiosError(error)) {
                     if (error.response?.status === 404) {
                         // An error 404 means the map was not found.
                         // Note: we should definitely change this.
                         throw error;
                     }
                     console.warn("Error while fetching map details", error);
-                    res.status(error.response?.status ?? 404);
-                    res.send("Error while fetching map details");
+                    const status = error.response?.status ?? 404;
+                    res.atomic(() => {
+                        res.status(status);
+                        res.send("Error while fetching map details");
+                    });
                     return;
-                } else {
+                }*/ else {
                     throw error;
                 }
             }

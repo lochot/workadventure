@@ -187,6 +187,11 @@ height,*/
         iframe.style.margin = "0";
         iframe.style.padding = "0";
         iframe.style.border = "none";
+        // There is a small glitch in Phaser where the iframe appears for a split second before the scene is loaded.
+        // We are dealing with this by hiding the iframe until the scene is loaded.
+        if (this.gameScene.scene.getStatus(this.gameScene.scene.key) <= Phaser.Scenes.CREATING) {
+            iframe.style.visibility = "hidden";
+        }
 
         const domElement = new DOMElement(
             this.gameScene,
@@ -199,6 +204,14 @@ height,*/
             domElement.scale = embeddedWebsiteEvent.scale;
         }
         domElement.setVisible(visible);
+
+        this.gameScene.sceneReadyToStartPromise
+            .then(() => {
+                iframe.style.visibility = "visible";
+            })
+            .catch((e) => {
+                console.error(e);
+            });
 
         switch (embeddedWebsiteEvent.origin) {
             case "player":

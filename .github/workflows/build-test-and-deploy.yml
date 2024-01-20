@@ -582,25 +582,48 @@ jobs:
         include:
           - browser: chromium
             shard: 1
-            nbShards: 2
+            nbShards: 3
+            renderer: auto
           - browser: chromium
             shard: 2
-            nbShards: 2
-          - browser: firefox
-            shard: 1
-            nbShards: 2
-          - browser: firefox
-            shard: 2
-            nbShards: 2
-          - browser: webkit
-            shard: 1
             nbShards: 3
-          - browser: webkit
-            shard: 2
-            nbShards: 3
-          - browser: webkit
+            renderer: auto
+          - browser: chromium
             shard: 3
             nbShards: 3
+            renderer: auto
+          - browser: firefox
+            shard: 1
+            nbShards: 3
+            renderer: auto
+          - browser: firefox
+            shard: 2
+            nbShards: 3
+            renderer: auto
+          - browser: firefox
+            shard: 3
+            nbShards: 3
+            renderer: auto
+          - browser: webkit
+            shard: 1
+            nbShards: 5
+            renderer: headless
+          - browser: webkit
+            shard: 2
+            nbShards: 5
+            renderer: headless
+          - browser: webkit
+            shard: 3
+            nbShards: 5
+            renderer: headless
+          - browser: webkit
+            shard: 4
+            nbShards: 5
+            renderer: headless
+          - browser: webkit
+            shard: 5
+            nbShards: 5
+            renderer: headless
     needs:
       - build-play
       - build-chat
@@ -646,7 +669,8 @@ jobs:
           sed -i "s/JITSI_XMPP_DOMAIN=/JITSI_XMPP_DOMAIN=prosody.workadventu.re/g" .env
           sed -i "s/KLAXOON_ENABLED=false/KLAXOON_ENABLED=true/g" .env
           sed -i "s/KLAXOON_CLIENT_ID=/KLAXOON_CLIENT_ID=${{ env.KLAXOON_CLIENT_ID }}/g" .env
-
+        env:
+          KLAXOON_CLIENT_ID: ${{ secrets.KLAXOON_CLIENT_ID }}
       - name: Download artifact
         uses: actions/download-artifact@v3
         with:
@@ -706,6 +730,7 @@ jobs:
         working-directory: tests
         env:
           DOCKER_TAG: ${{ github.event_name == 'pull_request' && env.GITHUB_HEAD_REF_SLUG || env.GITHUB_REF_SLUG }}
+          RENDERER_MODE: ${{ matrix.renderer }}
       - name: Display docker-compose logs on failure
         run: docker-compose -f docker-compose.yaml -f docker-compose-oidc.yaml -f docker-compose.e2e.yml logs
         if: failure()
@@ -791,6 +816,7 @@ jobs:
           echo "WOKA_SPEED=3" >> .env
         env:
           DOCKER_TAG: ${{ github.event_name == 'pull_request' && env.GITHUB_HEAD_REF_SLUG || env.GITHUB_REF_SLUG }}
+          KLAXOON_CLIENT_ID: ${{ secrets.KLAXOON_CLIENT_ID }}
         working-directory: contrib/docker
       - name: Start WorkAdventure
         run: docker-compose -f docker-compose.prod.yaml -f tests/docker-compose.test-maps.yaml up -d
@@ -854,7 +880,7 @@ jobs:
       - uses: rlespinasse/github-slug-action@4.2.3
 
       - name: Set ADMIN_URL if "deploy-connect-to-admin" label is set
-        run: echo "ADMIN_API_URL=https://${{ github.event_name == 'pull_request' && env.GITHUB_HEAD_REF_SLUG || env.GITHUB_REF_SLUG }}.test.workadventu.re" >> $GITHUB_ENV
+        run: echo "ADMIN_API_URL=https://admin-${{ github.event_name == 'pull_request' && env.GITHUB_HEAD_REF_SLUG || env.GITHUB_REF_SLUG }}.test.workadventu.re" >> $GITHUB_ENV
         if: ${{ (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'deploy-connect-to-admin')) || env.GITHUB_REF_SLUG == 'develop'  }}
 
       - name: Write certificate
@@ -906,6 +932,8 @@ jobs:
           REPORT_ISSUES_URL: ${{ secrets.REPORT_ISSUES_URL }}
           LOGROCKET_ID: ${{ secrets.LOGROCKET_ID }}
           KLAXOON_CLIENT_ID: ${{ secrets.KLAXOON_CLIENT_ID }}
+          GOOGLE_DRIVE_PICKER_CLIENT_ID: ${{ secrets.GOOGLE_DRIVE_PICKER_CLIENT_ID }}
+          GOOGLE_DRIVE_PICKER_APP_ID: ${{ secrets.GOOGLE_DRIVE_PICKER_APP_ID }}
         with:
           namespace: workadventure-${{ github.event_name == 'pull_request' && env.GITHUB_HEAD_REF_SLUG || env.GITHUB_REF_SLUG }}
 

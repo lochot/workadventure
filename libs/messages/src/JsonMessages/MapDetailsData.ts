@@ -50,6 +50,10 @@ const isMapThirdPartyData = z.object({
         description: "Whether the youtube tool is activated or not on this room",
         example: true,
     }),
+    googleDriveToolActivated: extendApi(z.boolean().optional(), {
+        description: "Whether the google drive tool is activated or not on this room",
+        example: true,
+    }),
     googleDocsToolActivated: extendApi(z.boolean().optional(), {
         description: "Whether the google docs tool is activated or not on this room",
         example: true,
@@ -156,7 +160,7 @@ export const isMapDetailsData = z.object({
     }),
     wamUrl: extendApi(z.string().url().optional(), {
         description: "The full URL to the WAM map file",
-        example: "https://myuser.github.io/myrepo/map.wam",
+        example: "https://map-storage.myworkadventure.com/myrepo/map.wam",
     }),
     authenticationMandatory: extendApi(z.boolean().nullable().optional(), {
         description: "Whether the authentication is mandatory or not for this map",

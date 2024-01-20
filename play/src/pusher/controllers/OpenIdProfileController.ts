@@ -25,8 +25,11 @@ export class OpenIdProfileController extends BaseHttpController {
             if (!resCheckTokenAuth.sub) {
                 throw new Error("Email was not found");
             }
-            res.setHeader("Content-Type", "text/html");
-            res.send(this.buildHtml(OPID_CLIENT_ISSUER, resCheckTokenAuth.sub));
+            const sub = resCheckTokenAuth.sub;
+            res.atomic(() => {
+                res.setHeader("Content-Type", "text/html");
+                res.send(this.buildHtml(OPID_CLIENT_ISSUER, sub));
+            });
             return;
         });
     }
@@ -52,7 +55,7 @@ export class OpenIdProfileController extends BaseHttpController {
                     <body>
                         <div class="container">
                             <section>
-                                <img src="${pictureUrl ? pictureUrl : "/images/profile"}">
+                                <img src="${pictureUrl ? pictureUrl : "/static/images/logo-WA-min.png"}">
                             </section>
                             <section>
                                 Profile validated by domain: <span style="font-weight: bold">${domain}</span>

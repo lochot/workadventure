@@ -3,10 +3,10 @@ import type { Subscription } from "rxjs";
 import { Readable, Writable, Unsubscriber, get, readable, writable } from "svelte/store";
 import Peer from "simple-peer/simplepeer.min.js";
 import type { RoomConnection } from "../Connection/RoomConnection";
-import { localStreamStore, obtainedMediaConstraintStore, videoBandwidthStore } from "../Stores/MediaStore";
+import { localStreamStore, videoBandwidthStore } from "../Stores/MediaStore";
 import { playersStore } from "../Stores/PlayersStore";
 import {
-    chatMessagesStore,
+    chatMessagesService,
     newChatMessageSubject,
     newChatMessageWritingStatusSubject,
     writingStatusMessageStore,
@@ -14,6 +14,10 @@ import {
 import { getIceServersConfig, getSdpTransform } from "../Components/Video/utils";
 import { SoundMeter } from "../Phaser/Components/SoundMeter";
 import { gameManager } from "../Phaser/Game/GameManager";
+import { apparentMediaContraintStore } from "../Stores/ApparentMediaContraintStore";
+import { TrackStreamWrapperInterface } from "../Streaming/Contract/TrackStreamWrapperInterface";
+import { TrackInterface } from "../Streaming/Contract/TrackInterface";
+import { showReportScreenStore } from "../Stores/ShowReportScreenStore";
 import type { ConstraintMessage, ObtainedMediaStreamConstraints } from "./P2PMessages/ConstraintMessage";
 import type { UserSimplePeerInterface } from "./SimplePeer";
 import { blackListManager } from "./BlackListManager";
@@ -28,7 +32,7 @@ export type PeerStatus = "connecting" | "connected" | "error" | "closed";
 /**
  * A peer connection used to transmit video / audio signals between 2 peers.
  */
-export class VideoPeer extends Peer {
+export class VideoPeer extends Peer implements TrackStreamWrapperInterface {
     public toClose = false;
     public _connected = false;
     public remoteStream!: MediaStream;
@@ -47,7 +51,7 @@ export class VideoPeer extends Peer {
     private newWritingStatusMessageSubscription: Subscription | undefined;
     private volumeStoreSubscribe?: Unsubscriber;
     private readonly localStreamStoreSubscribe: Unsubscriber;
-    private readonly obtainedMediaConstraintStoreSubscribe: Unsubscriber;
+    private readonly apparentMediaConstraintStoreSubscribe: Unsubscriber;
 
     constructor(
         public user: UserSimplePeerInterface,
@@ -142,7 +146,7 @@ export class VideoPeer extends Peer {
             this._statusStore.set("connected");
 
             this._connected = true;
-            chatMessagesStore.addIncomingUser(this.userId);
+            chatMessagesService.addIncomingUser(this.userId);
 
             this.newMessageSubscription = newChatMessageSubject.subscribe((newMessage) => {
                 if (!newMessage) return;
@@ -157,7 +161,9 @@ export class VideoPeer extends Peer {
             });
 
             this.newWritingStatusMessageSubscription = newChatMessageWritingStatusSubject.subscribe((status) => {
-                if (status == undefined) return;
+                if (status === undefined) {
+                    return;
+                }
                 this.write(
                     new Buffer(
                         JSON.stringify({
@@ -180,7 +186,7 @@ export class VideoPeer extends Peer {
                     }
                     case "message": {
                         if (!blackListManager.isBlackListed(this.userUuid)) {
-                            chatMessagesStore.addExternalMessage(this.userId, message.message);
+                            chatMessagesService.addExternalMessage(this.userId, message.message);
                         }
                         break;
                     }
@@ -203,6 +209,15 @@ export class VideoPeer extends Peer {
                     case "unblocked": {
                         this.blocked = false;
                         this.toggleRemoteStream(true);
+                        break;
+                    }
+                    case "kickoff": {
+                        if (message.value !== this.userUuid) break;
+                        this._statusStore.set("closed");
+                        this._connected = false;
+                        this.toClose = true;
+                        this._onFinish();
+                        this.destroy();
                         break;
                     }
                     default: {
@@ -241,7 +256,7 @@ export class VideoPeer extends Peer {
         this.localStreamStoreSubscribe = localStreamStore.subscribe((streamValue) => {
             if (streamValue.type === "success" && streamValue.stream) this.addStream(streamValue.stream);
         });
-        this.obtainedMediaConstraintStoreSubscribe = obtainedMediaConstraintStore.subscribe((constraints) => {
+        this.apparentMediaConstraintStoreSubscribe = apparentMediaContraintStore.subscribe((constraints) => {
             this.write(
                 new Buffer(
                     JSON.stringify({
@@ -297,6 +312,7 @@ export class VideoPeer extends Peer {
     public destroy(): void {
         try {
             this._connected = false;
+            console.log("destroy => this.toClose", this.toClose, this.closing);
             if (!this.toClose || this.closing) {
                 return;
             }
@@ -305,9 +321,9 @@ export class VideoPeer extends Peer {
             this.onUnBlockSubscribe.unsubscribe();
             this.newMessageSubscription?.unsubscribe();
             this.newWritingStatusMessageSubscription?.unsubscribe();
-            chatMessagesStore.addOutcomingUser(this.userId);
+            chatMessagesService.addOutcomingUser(this.userId);
             if (this.localStreamStoreSubscribe) this.localStreamStoreSubscribe();
-            if (this.obtainedMediaConstraintStoreSubscribe) this.obtainedMediaConstraintStoreSubscribe();
+            if (this.apparentMediaConstraintStoreSubscribe) this.apparentMediaConstraintStoreSubscribe();
             if (this.volumeStoreSubscribe) this.volumeStoreSubscribe();
             super.destroy();
         } catch (err) {
@@ -333,5 +349,51 @@ export class VideoPeer extends Peer {
 
     get statusStore(): Readable<PeerStatus> {
         return this._statusStore;
+    }
+
+    get videoTrackStore(): Readable<TrackInterface | undefined> {
+        throw new Error("Method not implemented.");
+    }
+    get audioTrackStore(): Readable<TrackInterface | undefined> {
+        throw new Error("Method not implemented.");
+    }
+    getVideoTrack(): TrackInterface | undefined {
+        throw new Error("Method not implemented.");
+    }
+    getAudioTrack(): TrackInterface | undefined {
+        throw new Error("Method not implemented.");
+    }
+    setAudioTrack(jitsiTrack: TrackInterface | undefined): void {
+        throw new Error("Method not implemented.");
+    }
+    setVideoTrack(jitsiTrack: TrackInterface | undefined): void {
+        throw new Error("Method not implemented.");
+    }
+    isEmpty(): boolean {
+        throw new Error("Method not implemented.");
+    }
+    isLocal(): boolean {
+        throw new Error("Method not implemented.");
+    }
+    muteAudioParticipant(): void {
+        this.connection.emitMuteParticipantIdSpace("peer", this.userUuid);
+    }
+    muteAudioEveryBody(): void {
+        this.connection.emitMuteEveryBodySpace("peer");
+    }
+    muteVideoParticipant(): void {
+        this.connection.emitMuteVideoParticipantIdSpace("peer", this.userUuid);
+    }
+    muteVideoEverybody(): void {
+        this.connection.emitMuteVideoEveryBodySpace("peer");
+    }
+    ban() {
+        throw new Error("Method not implemented.");
+    }
+    kickoff(): void {
+        this.connection.emitKickOffUserMessage(this.userUuid, "peer");
+    }
+    blockOrReportUser(): void {
+        showReportScreenStore.set({ userId: this.userId, userName: this.userName });
     }
 }

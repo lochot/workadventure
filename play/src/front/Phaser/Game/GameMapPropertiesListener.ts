@@ -1,6 +1,6 @@
 import { get } from "svelte/store";
 import type { ITiledMapLayer, ITiledMapObject } from "@workadventure/tiled-map-type-guard";
-import { AreaData, GameMapProperties } from "@workadventure/map-editor";
+import { AreaData, AreaDataProperties, GameMapProperties } from "@workadventure/map-editor";
 import { Jitsi } from "@workadventure/shared-utils";
 import { getSpeakerMegaphoneAreaName } from "@workadventure/map-editor/src/Utils";
 import { z } from "zod";
@@ -18,19 +18,9 @@ import { audioManagerFileStore, audioManagerVisibilityStore } from "../../Stores
 import { iframeListener } from "../../Api/IframeListener";
 import { Room } from "../../Connection/Room";
 import { LL } from "../../../i18n/i18n-svelte";
-import {
-    inJitsiStore,
-    inBbbStore,
-    silentStore,
-    inOpenWebsite,
-    requestedCameraState,
-    requestedMicrophoneState,
-    isSpeakerStore,
-} from "../../Stores/MediaStore";
-import { urlManager } from "../../Url/UrlManager";
+import { inJitsiStore, inBbbStore, silentStore, inOpenWebsite, isSpeakerStore } from "../../Stores/MediaStore";
 import { chatZoneLiveStore } from "../../Stores/ChatStore";
-import { connectionManager } from "../../Connection/ConnectionManager";
-import { currentMegaphoneNameStore, requestedMegaphoneStore } from "../../Stores/MegaphoneStore";
+import { currentLiveStreamingNameStore } from "../../Stores/MegaphoneStore";
 import { analyticsClient } from "./../../Administration/AnalyticsClient";
 import type { GameMapFrontWrapper } from "./GameMap/GameMapFrontWrapper";
 import type { GameScene } from "./GameScene";
@@ -105,6 +95,15 @@ export class GameMapPropertiesListener {
                 const isJitsiUrl = z.string().optional().safeParse(allProps.get(GameMapProperties.JITSI_URL));
                 let jitsiUrl = isJitsiUrl.success ? isJitsiUrl.data : undefined;
 
+                const isJitsiWidth = z
+                    .number()
+                    .min(1)
+                    .max(100)
+                    .default(50)
+                    .optional()
+                    .safeParse(allProps.get(GameMapProperties.JITSI_WIDTH));
+                const jitsiWidth = isJitsiWidth.success ? isJitsiWidth.data : 50;
+
                 let jwt: string | undefined;
                 if (JITSI_PRIVATE_MODE && !jitsiUrl) {
                     if (!this.scene.connection) {
@@ -156,9 +155,7 @@ export class GameMapPropertiesListener {
 
                 const coWebsite = new JitsiCoWebsite(
                     new URL(domain),
-                    false,
-                    undefined,
-                    undefined,
+                    jitsiWidth,
                     true,
                     roomName,
                     gameManager.getPlayerName() ?? "unknown",
@@ -269,7 +266,7 @@ export class GameMapPropertiesListener {
             const loop = allProps.get(GameMapProperties.AUDIO_LOOP) as boolean | undefined;
             newValue === undefined
                 ? audioManagerFileStore.unloadAudio()
-                : audioManagerFileStore.playAudio(newValue, this.scene.getMapDirUrl(), volume, loop);
+                : audioManagerFileStore.playAudio(newValue, this.scene.getMapUrl(), volume, loop);
             audioManagerVisibilityStore.set(!(newValue === undefined));
         });
 
@@ -277,7 +274,7 @@ export class GameMapPropertiesListener {
         this.gameMapFrontWrapper.onPropertyChange(GameMapProperties.PLAY_AUDIO_LOOP, (newValue) => {
             newValue === undefined
                 ? audioManagerFileStore.unloadAudio()
-                : audioManagerFileStore.playAudio(newValue, this.scene.getMapDirUrl(), undefined, true);
+                : audioManagerFileStore.playAudio(newValue, this.scene.getMapUrl(), undefined, true);
             audioManagerVisibilityStore.set(!(newValue === undefined));
         });
 
@@ -293,13 +290,11 @@ export class GameMapPropertiesListener {
 
         // Muc zone
         this.gameMapFrontWrapper.onPropertyChange(GameMapProperties.CHAT_NAME, (newValue, oldValue, allProps) => {
-            if (!connectionManager.currentRoom) {
-                throw new Error("Race condition : Current room is not defined yet");
-            } else if (!connectionManager.currentRoom.enableChat) {
+            if (!this.scene.room.enableChat) {
                 return;
             }
 
-            const playUri = urlManager.getPlayUri() + "/";
+            const playUri = this.scene.roomUrl + "/";
 
             if (oldValue !== undefined) {
                 iframeListener.sendLeaveMucEventToChatIframe(playUri + oldValue);
@@ -333,6 +328,10 @@ export class GameMapPropertiesListener {
 
         this.gameMapFrontWrapper.onLeaveArea((oldAreas) => {
             this.onLeaveAreasHandler(oldAreas);
+        });
+
+        this.gameMapFrontWrapper.onUpdateArea((area, oldProperties, newProperties) => {
+            this.onUpdateAreasHandler(area, oldProperties, newProperties);
         });
 
         this.gameMapFrontWrapper.onEnterDynamicArea((newAreas) => {
@@ -372,6 +371,14 @@ export class GameMapPropertiesListener {
 
     private onEnterAreasHandler(areas: AreaData[]): void {
         this.areasPropertiesListener.onEnterAreasHandler(areas);
+    }
+
+    private onUpdateAreasHandler(
+        area: AreaData,
+        oldProperties: AreaDataProperties | undefined,
+        newProperties: AreaDataProperties | undefined
+    ): void {
+        this.areasPropertiesListener.onUpdateAreasHandler(area, oldProperties, newProperties);
     }
 
     private onLeaveAreasHandler(areas: AreaData[]): void {
@@ -508,12 +515,12 @@ export class GameMapPropertiesListener {
         }
         const speakerZone = place.properties.find((property) => property.name === GameMapProperties.SPEAKER_MEGAPHONE);
         if (speakerZone && speakerZone.type === "string" && speakerZone.value !== undefined) {
-            currentMegaphoneNameStore.set(speakerZone.value);
-            this.scene.broadcastService.joinSpace(speakerZone.value, false);
             isSpeakerStore.set(true);
-            if (get(requestedCameraState) || get(requestedMicrophoneState)) {
+            currentLiveStreamingNameStore.set(speakerZone.value);
+            this.scene.broadcastService.joinSpace(speakerZone.value, false);
+            /*if (get(requestedCameraState) || get(requestedMicrophoneState)) {
                 requestedMegaphoneStore.set(true);
-            }
+            }*/
         }
     }
 
@@ -523,10 +530,9 @@ export class GameMapPropertiesListener {
         }
         const speakerZone = place.properties.find((property) => property.name === GameMapProperties.SPEAKER_MEGAPHONE);
         if (speakerZone && speakerZone.type === "string" && speakerZone.value !== undefined) {
-            currentMegaphoneNameStore.set(undefined);
-            this.scene.broadcastService.leaveSpace(speakerZone.value);
-            requestedMegaphoneStore.set(false);
             isSpeakerStore.set(false);
+            currentLiveStreamingNameStore.set(undefined);
+            this.scene.broadcastService.leaveSpace(speakerZone.value);
         }
     }
 
@@ -543,7 +549,7 @@ export class GameMapPropertiesListener {
                 listenerZone.value
             );
             if (speakerZoneName) {
-                currentMegaphoneNameStore.set(speakerZoneName);
+                currentLiveStreamingNameStore.set(speakerZoneName);
                 this.scene.broadcastService.joinSpace(speakerZoneName, false);
             }
         }
@@ -562,7 +568,7 @@ export class GameMapPropertiesListener {
                 listenerZone.value
             );
             if (speakerZoneName) {
-                currentMegaphoneNameStore.set(undefined);
+                currentLiveStreamingNameStore.set(undefined);
                 this.scene.broadcastService.leaveSpace(speakerZoneName);
             }
         }

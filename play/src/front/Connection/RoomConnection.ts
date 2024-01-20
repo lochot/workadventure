@@ -37,6 +37,7 @@ import {
     AddSpaceFilterMessage,
     UpdateSpaceFilterMessage,
     RemoveSpaceFilterMessage,
+    UpdateSpaceMetadataMessage,
     AddSpaceUserMessage,
     UpdateSpaceUserMessage,
     RemoveSpaceUserMessage,
@@ -47,6 +48,17 @@ import {
     UnwatchSpaceMessage,
     EmbeddableWebsiteAnswer,
     CompanionTextureMessage,
+    RoomShortDescription,
+    MuteMicrophoneMessage,
+    MuteVideoMessage,
+    MuteMicrophoneEverybodyMessage,
+    MuteVideoEverybodyMessage,
+    MutedMessage,
+    MutedVideoMessage,
+    AskMuteVideoMessage,
+    AskMuteMicrophoneMessage,
+    AskMutedMessage,
+    AskMutedVideoMessage,
 } from "@workadventure/messages";
 import { BehaviorSubject, Subject } from "rxjs";
 import type { AreaData, AtLeast, WAMEntityData } from "@workadventure/map-editor";
@@ -72,7 +84,10 @@ import { ABSOLUTE_PUSHER_URL } from "../Enum/ComputedConst";
 import { selectCompanionSceneVisibleStore } from "../Stores/SelectCompanionStore";
 import { SelectCompanionScene, SelectCompanionSceneName } from "../Phaser/Login/SelectCompanionScene";
 import { CompanionTextureDescriptionInterface } from "../Phaser/Companion/CompanionTextures";
-import { currentMegaphoneNameStore } from "../Stores/MegaphoneStore";
+import { currentLiveStreamingNameStore } from "../Stores/MegaphoneStore";
+import { ReceiveEventEvent } from "../Api/Events/ReceiveEventEvent";
+import { isSpeakerStore } from "../Stores/MediaStore";
+import { chatZoneLiveStore } from "../Stores/ChatStore";
 import { localUserStore } from "./LocalUserStore";
 import { connectionManager } from "./ConnectionManager";
 import { adminMessagesService } from "./AdminMessagesService";
@@ -198,8 +213,33 @@ export class RoomConnection implements RoomConnection {
     public readonly updateSpaceUserMessageStream = this._updateSpaceUserMessageStream.asObservable();
     private readonly _removeSpaceUserMessageStream = new Subject<RemoveSpaceUserMessage>();
     public readonly removeSpaceUserMessageStream = this._removeSpaceUserMessageStream.asObservable();
+    private readonly _updateSpaceMetadataMessageStream = new Subject<UpdateSpaceMetadataMessage>();
+    public readonly updateSpaceMetadataMessageStream = this._updateSpaceMetadataMessageStream.asObservable();
     private readonly _megaphoneSettingsMessageStream = new BehaviorSubject<MegaphoneSettings | undefined>(undefined);
     public readonly megaphoneSettingsMessageStream = this._megaphoneSettingsMessageStream.asObservable();
+    private readonly _receivedEventMessageStream = new Subject<ReceiveEventEvent>();
+    public readonly receivedEventMessageStream = this._receivedEventMessageStream.asObservable();
+
+    private readonly _muteMicrophoneMessage = new Subject<MuteMicrophoneMessage>();
+    public readonly muteMicrophoneMessage = this._muteMicrophoneMessage.asObservable();
+    private readonly _muteVideoMessage = new Subject<MuteVideoMessage>();
+    public readonly muteVideoMessage = this._muteVideoMessage.asObservable();
+    private readonly _muteMicrophoneEverybodyMessage = new Subject<MuteMicrophoneEverybodyMessage>();
+    public readonly muteMicrophoneEverybodyMessage = this._muteMicrophoneEverybodyMessage.asObservable();
+    private readonly _muteVideoEverybodyMessage = new Subject<MuteVideoEverybodyMessage>();
+    public readonly muteVideoEverybodyMessage = this._muteVideoEverybodyMessage.asObservable();
+    private readonly _askMuteVideoMessage = new Subject<AskMuteVideoMessage>();
+    public readonly askMuteVideoMessage = this._askMuteVideoMessage.asObservable();
+    private readonly _askMuteMicrophoneMessage = new Subject<AskMuteMicrophoneMessage>();
+    public readonly askMuteMicrophoneMessage = this._askMuteMicrophoneMessage.asObservable();
+    private readonly _mutedMessage = new Subject<MutedMessage>();
+    public readonly mutedMessage = this._mutedMessage.asObservable();
+    private readonly _mutedVideoMessage = new Subject<MutedVideoMessage>();
+    public readonly mutedVideoMessage = this._mutedVideoMessage.asObservable();
+    private readonly _askMutedMessage = new Subject<AskMutedMessage>();
+    public readonly askMutedMessage = this._askMutedMessage.asObservable();
+    private readonly _askMutedVideoMessage = new Subject<AskMutedVideoMessage>();
+    public readonly askMutedVideoMessage = this._askMutedVideoMessage.asObservable();
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     public static setWebsocketFactory(websocketFactory: (url: string) => any): void {
@@ -385,8 +425,69 @@ export class RoomConnection implements RoomConnection {
                                 this._removeSpaceUserMessageStream.next(subMessage.removeSpaceUserMessage);
                                 break;
                             }
+                            case "updateSpaceMetadataMessage": {
+                                this._updateSpaceMetadataMessageStream.next(subMessage.updateSpaceMetadataMessage);
+                                break;
+                            }
                             case "megaphoneSettingsMessage": {
                                 this._megaphoneSettingsMessageStream.next(subMessage.megaphoneSettingsMessage);
+                                break;
+                            }
+                            case "receivedEventMessage": {
+                                this._receivedEventMessageStream.next({
+                                    name: subMessage.receivedEventMessage.name,
+                                    data: subMessage.receivedEventMessage.data,
+                                    senderId: subMessage.receivedEventMessage.senderId,
+                                });
+                                break;
+                            }
+                            case "kickOffMessage": {
+                                if (subMessage.kickOffMessage.userId !== this.userId?.toString()) break;
+
+                                isSpeakerStore.set(false);
+                                currentLiveStreamingNameStore.set(undefined);
+                                const scene = gameManager.getCurrentGameScene();
+                                scene.broadcastService.leaveSpace(subMessage.kickOffMessage.spaceName);
+                                iframeListener.sendLeaveMucEventToChatIframe(`${scene.roomUrl}/${slugify(name)}`);
+                                chatZoneLiveStore.set(false);
+                                break;
+                            }
+                            case "muteMicrophoneMessage": {
+                                console.log("muteMicrophoneSpaceUserMessage", subMessage.muteMicrophoneMessage);
+                                if (subMessage.muteMicrophoneMessage.userId !== this.userId?.toString()) break;
+
+                                this._muteMicrophoneMessage.next(subMessage.muteMicrophoneMessage);
+                                break;
+                            }
+                            case "muteVideoMessage": {
+                                if (subMessage.muteVideoMessage.userId !== this.userId?.toString()) break;
+
+                                this._muteVideoMessage.next(subMessage.muteVideoMessage);
+                                break;
+                            }
+                            case "muteMicrophoneEverybodyMessage": {
+                                // If the sender receive this message, ignore it
+                                if (subMessage.muteMicrophoneEverybodyMessage.userId === this.userId?.toString()) break;
+                                this._muteMicrophoneEverybodyMessage.next(subMessage.muteMicrophoneEverybodyMessage);
+                                break;
+                            }
+                            case "muteVideoEverybodyMessage": {
+                                // If the sender receive this message, ignore it
+                                if (subMessage.muteVideoEverybodyMessage.userId === this.userId?.toString()) break;
+
+                                this._muteVideoEverybodyMessage.next(subMessage.muteVideoEverybodyMessage);
+                                break;
+                            }
+                            case "askMuteMicrophoneMessage": {
+                                if (subMessage.askMuteMicrophoneMessage.userId !== this.userId?.toString()) break;
+
+                                this._askMuteMicrophoneMessage.next(subMessage.askMuteMicrophoneMessage);
+                                break;
+                            }
+                            case "askMuteVideoMessage": {
+                                if (subMessage.askMuteVideoMessage.userId !== this.userId?.toString()) break;
+
+                                this._askMuteVideoMessage.next(subMessage.askMuteVideoMessage);
                                 break;
                             }
                             default: {
@@ -490,7 +591,7 @@ export class RoomConnection implements RoomConnection {
                     break;
                 }
                 case "tokenExpiredMessage": {
-                    connectionManager.logout().catch((e) => console.error(e));
+                    connectionManager.logout();
                     this.closeConnection(); //technically, this isn't needed since loadOpenIDScreen() will do window.location.assign() but I prefer to leave it for consistency
                     break;
                 }
@@ -636,6 +737,24 @@ export class RoomConnection implements RoomConnection {
                 }
                 case "xmppSettingsMessage": {
                     this._xmppSettingsMessageStream.next(message.xmppSettingsMessage);
+                    break;
+                }
+                case "mutedMessage": {
+                    console.log("mutedMessage", message.mutedMessage);
+                    this._mutedMessage.next(message.mutedMessage);
+                    break;
+                }
+                case "mutedVideoMessage": {
+                    this._mutedVideoMessage.next(message.mutedVideoMessage);
+                    break;
+                }
+                case "askMutedMessage": {
+                    console.log("askMutedMessage", message.askMutedMessage);
+                    this._askMutedMessage.next(message.askMutedMessage);
+                    break;
+                }
+                case "askMutedVideoMessage": {
+                    this._askMutedVideoMessage.next(message.askMutedVideoMessage);
                     break;
                 }
                 default: {
@@ -865,7 +984,7 @@ export class RoomConnection implements RoomConnection {
 
     public onServerDisconnected(callback: () => void): void {
         this.socket.addEventListener("close", (event) => {
-            // FIXME: technically incorrect: if we call onServerDisconnected several times, we will run several times the code (and we probably want to run only callback() serveral times).
+            // FIXME: technically incorrect: if we call onServerDisconnected several times, we will run several times the code (and we probably want to run only callback() several times).
             // FIXME: call to query.reject and this.completeStreams should probably be stored somewhere else.
 
             // Cleanup queries:
@@ -913,9 +1032,30 @@ export class RoomConnection implements RoomConnection {
         this._itemEventMessageStream.complete();
         this._emoteEventMessageStream.complete();
         this._variableMessageStream.complete();
+        this._editMapCommandMessageStream.complete();
         this._playerDetailsUpdatedMessageStream.complete();
         this._connectionErrorStream.complete();
+        this._xmppSettingsMessageStream.complete();
         this._moveToPositionMessageStream.complete();
+        this._joinMucRoomMessageStream.complete();
+        this._leaveMucRoomMessageStream.complete();
+        this._addSpaceUserMessageStream.complete();
+        this._updateSpaceUserMessageStream.complete();
+        this._removeSpaceUserMessageStream.complete();
+        this._updateSpaceMetadataMessageStream.complete();
+        this._megaphoneSettingsMessageStream.complete();
+        this._receivedEventMessageStream.complete();
+        this._updateSpaceMetadataMessageStream.complete();
+        this._muteMicrophoneMessage.complete();
+        this._muteVideoMessage.complete();
+        this._muteMicrophoneEverybodyMessage.complete();
+        this._muteVideoEverybodyMessage.complete();
+        this._askMuteVideoMessage.complete();
+        this._askMuteMicrophoneMessage.complete();
+        this._mutedMessage.complete();
+        this._mutedVideoMessage.complete();
+        this._askMutedMessage.complete();
+        this._askMutedVideoMessage.complete();
     }
 
     public getUserId(): number {
@@ -947,6 +1087,21 @@ export class RoomConnection implements RoomConnection {
                 },
             },
         });
+    }
+
+    public async emitScriptableEvent(name: string, data: unknown, targetUserIds: number[] | undefined): Promise<void> {
+        const answer = await this.query({
+            $case: "sendEventQuery",
+            sendEventQuery: {
+                name,
+                data,
+                targetUserIds: targetUserIds ?? [],
+            },
+        });
+        if (answer.$case !== "sendEventAnswer") {
+            throw new Error("Unexpected answer");
+        }
+        return;
     }
 
     public uploadAudio(file: FormData) {
@@ -981,6 +1136,18 @@ export class RoomConnection implements RoomConnection {
                 reportPlayerMessage: {
                     reportedUserUuid,
                     reportComment,
+                },
+            },
+        });
+    }
+
+    public emitBanPlayerMessage(banUserUuid: string, banUserName: string): void {
+        this.send({
+            message: {
+                $case: "banPlayerMessage",
+                banPlayerMessage: {
+                    banUserUuid,
+                    banUserName,
                 },
             },
         });
@@ -1390,7 +1557,7 @@ export class RoomConnection implements RoomConnection {
 
     public emitWatchSpaceLiveStreaming(spaceName: string) {
         const spaceFilter: SpaceFilterMessage = {
-            filterName: "testFilter",
+            filterName: "watchSpaceLiveStreaming",
             spaceName,
             filter: {
                 $case: "spaceFilterLiveStreaming",
@@ -1415,6 +1582,18 @@ export class RoomConnection implements RoomConnection {
                 $case: "unwatchSpaceMessage",
                 unwatchSpaceMessage: UnwatchSpaceMessage.fromPartial({
                     spaceName,
+                }),
+            },
+        });
+    }
+
+    public emitUpdateSpaceMetadata(spaceName: string, metadata: { [key: string]: unknown }): void {
+        this.send({
+            message: {
+                $case: "updateSpaceMetadataMessage",
+                updateSpaceMetadataMessage: UpdateSpaceMetadataMessage.fromPartial({
+                    spaceName,
+                    metadata: JSON.stringify(metadata),
                 }),
             },
         });
@@ -1454,7 +1633,7 @@ export class RoomConnection implements RoomConnection {
     }
 
     public emitMegaphoneState(state: boolean) {
-        const currentMegaphoneName = get(currentMegaphoneNameStore);
+        const currentMegaphoneName = get(currentLiveStreamingNameStore);
         this.send({
             message: {
                 $case: "megaphoneStateMessage",
@@ -1487,6 +1666,17 @@ export class RoomConnection implements RoomConnection {
             throw new Error("Unexpected answer");
         }
         return answer.roomTagsAnswer.tags;
+    }
+
+    public async queryRoomsFromSameWorld(): Promise<RoomShortDescription[]> {
+        const answer = await this.query({
+            $case: "roomsFromSameWorldQuery",
+            roomsFromSameWorldQuery: {},
+        });
+        if (answer.$case !== "roomsFromSameWorldAnswer") {
+            throw new Error("Unexpected answer");
+        }
+        return answer.roomsFromSameWorldAnswer.roomDescriptions;
     }
 
     public async queryEmbeddableWebsite(url: string): Promise<EmbeddableWebsiteAnswer> {
@@ -1522,5 +1712,73 @@ export class RoomConnection implements RoomConnection {
             }
         }
         return value;
+    }
+
+    public emitMuteParticipantIdSpace(spaceName: string, participantId: string) {
+        this.send({
+            message: {
+                $case: "muteParticipantIdMessage",
+                muteParticipantIdMessage: {
+                    spaceName,
+                    mutedUserUuid: participantId,
+                },
+            },
+        });
+    }
+
+    public emitMuteEveryBodySpace(spaceName: string) {
+        if (!this.userId) {
+            console.warn("No user id defined to send a message to mute every microphone!");
+            return;
+        }
+        this.send({
+            message: {
+                $case: "muteEveryBodyParticipantMessage",
+                muteEveryBodyParticipantMessage: {
+                    spaceName,
+                    senderUserId: this.userId.toString(),
+                },
+            },
+        });
+    }
+
+    public emitMuteVideoParticipantIdSpace(spaceName: string, participantId: string) {
+        this.send({
+            message: {
+                $case: "muteVideoParticipantIdMessage",
+                muteVideoParticipantIdMessage: {
+                    spaceName,
+                    mutedUserUuid: participantId,
+                },
+            },
+        });
+    }
+
+    public emitMuteVideoEveryBodySpace(spaceName: string) {
+        if (!this.userId) {
+            console.warn("No user id defined to send a message to mute every video!");
+            return;
+        }
+        this.send({
+            message: {
+                $case: "muteVideoEveryBodyParticipantMessage",
+                muteVideoEveryBodyParticipantMessage: {
+                    spaceName,
+                    userId: this.userId.toString(),
+                },
+            },
+        });
+    }
+
+    public emitKickOffUserMessage(userId: string, spaceName: string): void {
+        this.send({
+            message: {
+                $case: "kickOffUserMessage",
+                kickOffUserMessage: {
+                    userId,
+                    spaceName,
+                },
+            },
+        });
     }
 }

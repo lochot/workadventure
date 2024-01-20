@@ -18,6 +18,7 @@ import {
     mentionsUserStore,
 } from "../Stores/ChatStore";
 import { Message } from "../Model/Message";
+import { iframeListener } from "../IframeListener";
 import { AbstractRoom, MessageType, User } from "./AbstractRoom";
 import { XmppClient } from "./XmppClient";
 import { WaLink, WaReceivedReactions, WaUserInfo } from "./Lib/Plugin";
@@ -60,10 +61,12 @@ export class MucRoom extends AbstractRoom {
         return this.roomJid.bare;
     }
 
-    public getUserByJid(jid: string): User {
+    public getUserByJid(jid: string): User | undefined {
         const user = this.presenceStore.get(jid);
         if (!user) {
-            throw new Error("No user found for this JID");
+            //throw new Error("No user found for this JID");
+            console.error("No user found for this JID");
+            return undefined;
         }
         return get(user);
     }
@@ -157,17 +160,15 @@ export class MucRoom extends AbstractRoom {
         const response = await this.xmppClient.socket.setRoomAffiliation(this.roomJid.bare, userJID, type, "test");
         debug(`[XMPP][${this.name}] >> Affiliation sent ${response}`);
     }
-    public sendBan(userJID: string, name: string, playUri: string) {
+    public sendBan(userJID: string, uuid?: string, name?: string) {
         if (this.closed) {
             return;
         }
-        console.warn("Implement the ban method to send the message to the front > pusher (> admin)", {
-            userJID,
-            name,
-            playUri,
-        });
+
+        // Send ban message to parent iframe
+        if (uuid != undefined && name != undefined) iframeListener.sendBanUser(uuid, name);
+
         void this.sendAffiliate("outcast", userJID);
-        //this.xmppClient.getConnection().emitBanUserByUuid(playUri, userJID.local, name, "Test message de ban");
         debug(`[XMPP][${this.name}] >> Ban user message sent`);
     }
     public sendChatState(state: ChatState) {

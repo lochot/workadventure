@@ -4,6 +4,9 @@
     import { ADMIN_URL } from "../../Enum/EnvironmentVariable";
     import { LL } from "../../../i18n/i18n-svelte";
     import { warningContainerStore } from "../../Stores/MenuStore";
+
+    /* eslint-disable svelte/no-at-html-tags */
+
     const registerLink = ADMIN_URL + "/second-step-register";
 
     function closeBanner() {
@@ -33,6 +36,7 @@
             {/if}
         </p>
         {#if $bannerStore.closable}
+            <!-- svelte-ignore a11y-click-events-have-key-events -->
             <span
                 class="tw-absolute tw-right-4 tw-top-0 tw-flex tw-items-center tw-h-10 tw-text-xl tw-cursor-pointer"
                 style={`color: ${$bannerStore.textColor ?? "red"};`}
@@ -48,7 +52,9 @@
         </p>
     {:else}
         <h2>{$LL.warning.title()}</h2>
-        <p>{@html $LL.warning.content({ upgradeLink: ADMIN_URL + "/pricing" })}</p>
+        <p>
+            {@html $LL.warning.content({ upgradeLink: ADMIN_URL + "/pricing" })}
+        </p>
     {/if}
 </main>
 

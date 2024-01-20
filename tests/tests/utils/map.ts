@@ -1,5 +1,6 @@
 import {Page} from "@playwright/test";
 import {evaluateScript} from "./scripting";
+import { RENDERER_MODE } from "./environment";
 
 class Map {
     async walkTo(page: Page, key: string, delay = 0){
@@ -18,6 +19,29 @@ class Map {
             x,
             y,
         });
+    }
+
+    async teleportToPosition(page: Page, x: number, y: number){
+        await evaluateScript(page, async ({x, y}) => {
+            await WA.player.teleport(x, y);
+            return;
+        }, {
+            x,
+            y,
+        });
+    }
+
+    async goToRoom(page: Page, room: string){
+        await evaluateScript(page, async ({ room }) => {
+            WA.nav.goToRoom(room);
+        }, {
+            room,
+        });
+    }
+
+    url(end: string){
+        const protocol = process.env.MAP_STORAGE_PROTOCOL ?? 'http';
+        return `${protocol}://play.workadventure.localhost/~/maps/${end}.wam?phaserMode=${RENDERER_MODE}`;
     }
 }
 
