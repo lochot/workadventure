@@ -2,7 +2,7 @@ import type { BaseTranslation } from "../i18n-types";
 
 const woka: BaseTranslation = {
     customWoka: {
-        title: "Customize your Avatar",
+        title: "Customize your WOKA",
         navigation: {
             return: "Return",
             back: "Back",
@@ -11,9 +11,9 @@ const woka: BaseTranslation = {
         },
     },
     selectWoka: {
-        title: "Select your Avatar",
+        title: "Select your WOKA",
         continue: "Continue",
-        customize: "Customize your Avatar",
+        customize: "Customize your WOKA",
     },
     menu: {
         businessCard: "Business Card",

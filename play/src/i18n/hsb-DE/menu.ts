@@ -20,7 +20,7 @@ const menu: DeepPartial<Translation["menu"]> = {
     profile: {
         edit: {
             name: "twoje mjeno změnić",
-            woka: "twoje avatar změnić",
+            woka: "twoje WOKA změnić",
             companion: "twojeho přewodźerja změnić",
             camera: "nastajenja kamery změnić",
         },
