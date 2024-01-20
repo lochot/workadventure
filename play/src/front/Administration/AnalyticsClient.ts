@@ -133,14 +133,6 @@ class AnalyticsClient {
             .catch((e) => console.error(e));
     }
 
-    openRegister(): void {
-        this.posthogPromise
-            ?.then((posthog) => {
-                posthog.capture("wa-opened-register");
-            })
-            .catch((e) => console.error(e));
-    }
-
     openInvite(): void {
         this.posthogPromise
             ?.then((posthog) => {
@@ -512,7 +504,12 @@ class AnalyticsClient {
     addMapEditorProperty(type: string, propertyName: string): void {
         this.posthogPromise
             ?.then((posthog) => {
-                posthog.capture(`wa_mapeditor_${type}_add_${propertyName}_property`);
+                // 8 decembre 2023: this event is not used anymore
+                // posthog.capture(`wa_map-editor_${type}_add_${propertyName}_property`);
+                posthog.capture(`wa_map-editor_add_property`, {
+                    name: propertyName,
+                    type,
+                });
             })
             .catch((e) => console.error(e));
     }
@@ -520,7 +517,12 @@ class AnalyticsClient {
     removeMapEditorProperty(type: string, propertyName: string): void {
         this.posthogPromise
             ?.then((posthog) => {
-                posthog.capture(`wa_map-editor_${type}_remove_${propertyName}_property`);
+                // 8 decembre 2023: this event is not used anymore
+                // posthog.capture(`wa_map-editor_${type}_remove_${propertyName}_property`);
+                posthog.capture(`wa_map-editor_remove_property`, {
+                    name: propertyName,
+                    type,
+                });
             })
             .catch((e) => console.error(e));
     }
@@ -528,7 +530,44 @@ class AnalyticsClient {
     openMapEditorTool(toolName: string): void {
         this.posthogPromise
             ?.then((posthog) => {
-                posthog.capture(`wa_map-editor_open_${toolName}`);
+                // 8 decembre 2023: this event is not used anymore
+                // posthog.capture(`wa_map-editor_open_${toolName}`);
+                posthog.capture(`wa_map-editor_open_tool`, {
+                    name: toolName,
+                });
+            })
+            .catch((e) => console.error(e));
+    }
+
+    clicPropertykMapEditor(name: string, style?: string): void {
+        this.posthogPromise
+            ?.then((posthog) => {
+                posthog.capture(`wa_map-editor_click_property`, {
+                    name,
+                    style,
+                });
+            })
+            .catch((e) => console.error(e));
+    }
+
+    enterAreaMapEditor(id: string, name: string): void {
+        this.posthogPromise
+            ?.then((posthog) => {
+                posthog.capture(`wa_map-editor_enter_area`, {
+                    id,
+                    name,
+                });
+            })
+            .catch((e) => console.error(e));
+    }
+
+    leaveAreaMapEditor(id: string, name: string): void {
+        this.posthogPromise
+            ?.then((posthog) => {
+                posthog.capture(`wa_map-editor_leaver_area`, {
+                    id,
+                    name,
+                });
             })
             .catch((e) => console.error(e));
     }
@@ -560,6 +599,77 @@ class AnalyticsClient {
         this.posthogPromise
             ?.then((posthog) => {
                 posthog.capture(`wa_no_video_stream_received`);
+            })
+            .catch((e) => console.error(e));
+    }
+
+    moreActionMetting(): void {
+        this.posthogPromise
+            ?.then((posthog) => {
+                posthog.capture("wa_more_meeting_action");
+            })
+            .catch((e) => console.error(e));
+    }
+
+    pinMeetingAction(): void {
+        this.posthogPromise
+            ?.then((posthog) => {
+                posthog.capture("wa_pin_meeting_action");
+            })
+            .catch((e) => console.error(e));
+    }
+
+    muteMicrophoneMeetingAction(): void {
+        this.posthogPromise
+            ?.then((posthog) => {
+                posthog.capture("wa_mute_microphone_meeting_action");
+            })
+            .catch((e) => console.error(e));
+    }
+
+    muteMicrophoneEverybodyMeetingAction(): void {
+        this.posthogPromise
+            ?.then((posthog) => {
+                posthog.capture("wa_mute_microphone_everybody_meeting_action");
+            })
+            .catch((e) => console.error(e));
+    }
+
+    muteVideoMeetingAction(): void {
+        this.posthogPromise
+            ?.then((posthog) => {
+                posthog.capture("wa_mute_video_meeting_action");
+            })
+            .catch((e) => console.error(e));
+    }
+    muteVideoEverybodyMeetingAction(): void {
+        this.posthogPromise
+            ?.then((posthog) => {
+                posthog.capture("wa_mute_video_everybody_meeting_action");
+            })
+            .catch((e) => console.error(e));
+    }
+
+    kickoffMeetingAction(): void {
+        this.posthogPromise
+            ?.then((posthog) => {
+                posthog.capture("wa_kickoff_meeting_action");
+            })
+            .catch((e) => console.error(e));
+    }
+
+    sendPrivateMessageMeetingAction(): void {
+        this.posthogPromise
+            ?.then((posthog) => {
+                posthog.capture("wa_send_private_message_meeting_action");
+            })
+            .catch((e) => console.error(e));
+    }
+
+    reportMeetingAction(): void {
+        this.posthogPromise
+            ?.then((posthog) => {
+                posthog.capture("wa_report_meeting_action");
             })
             .catch((e) => console.error(e));
     }

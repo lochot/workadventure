@@ -36,7 +36,7 @@ const mapEditor: BaseTranslation = {
             defaultButtonLabel: "Open Jitsi Room",
             audioMutedLabel: "Muted by default",
             moreOptionsLabel: "More Options",
-            trigger: "Interaction",
+            trigger: "Open trigger",
             triggerMessage: "Toast Message",
             triggerShowImmediately: "Show immediately on enter",
             triggerOnClick: "Start as minimized in bottom bar",
@@ -59,6 +59,7 @@ const mapEditor: BaseTranslation = {
             audioLinkLabel: "Audio Link",
             audioLinkPlaceholder: "https://xxx.yyy/smthing.mp3",
             defaultButtonLabel: "Play music",
+            error: "Could not load sound",
         },
         linkProperties: {
             label: "Open Link",
@@ -82,17 +83,17 @@ const mapEditor: BaseTranslation = {
             warningEmbeddableLink: "This link cannot be embedded.",
             errorInvalidUrl: 'Please enter a valid URL (starting with "https://")',
             findOutMoreHere: "Find out more here",
+            openPickerSelector: "Open picker selector",
         },
         advancedOptions: "Advanced Options",
         speakerMegaphoneProperties: {
-            id: "Speaker zone identfier use for create unique room",
-            label: "Speaker zone for megaphone",
+            label: "Speaker zone",
             description: "",
             nameLabel: "Name",
             namePlaceholder: "MySpeakerZone",
         },
         listenerMegaphoneProperties: {
-            label: "ListenerZone for megaphone",
+            label: "Attendees zone",
             description: "",
             nameLabel: "SpeakerZone Name",
             namePlaceholder: "MySpeakerZone",
@@ -150,10 +151,20 @@ const mapEditor: BaseTranslation = {
             error: "Please enter a valid Eraser URL",
             disabled: "Eraser integration is disabled.",
         },
+        googleDriveProperties: {
+            label: "Open Google Drive",
+            description: "Open Google Drive within WorkAdventure or as a new tab.",
+            error: "Please enter a valid Google Drive URL",
+            disabled: "Google Drive integration is disabled.",
+        },
     },
     areaEditor: {
         editInstructions: "Click an area to modify its properties.",
         nameLabel: "Name",
+    },
+    areaEditorInstructions: {
+        title: "How it works ?",
+        description: "Draw a zone on the map to create a new one.",
     },
     entityEditor: {
         itemPicker: {

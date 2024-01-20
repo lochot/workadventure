@@ -15,12 +15,20 @@
 
     import Woka from "../Woka/WokaFromUserId.svelte";
     import { isMediaBreakpointOnly } from "../../Utils/BreakpointsUtils";
+    // @ts-ignore
     import microphoneOffImg from "../images/microphone-off.png";
     import { LayoutMode } from "../../WebRtc/LayoutManager";
     import { selectDefaultSpeaker, speakerSelectedStore } from "../../Stores/MediaStore";
     import { embedScreenLayoutStore } from "../../Stores/EmbedScreensStore";
     import { analyticsClient } from "../../Administration/AnalyticsClient";
-    import BanReportBox from "./BanReportBox.svelte";
+    import ActionMediaBox from "./ActionMediaBox.svelte";
+
+    // Extend the HTMLVideoElement interface to add the setSinkId method.
+    // See https://developer.mozilla.org/en-US/docs/Web/API/HTMLMediaElement/setSinkId
+    interface HTMLVideoElementExt extends HTMLVideoElement {
+        setSinkId?(deviceId: string): Promise<void>;
+        requestVideoFrameCallback(callback: VideoFrameRequestCallback, options?: IdleRequestOptions): number;
+    }
 
     export let clickable = false;
     export let isHightlighted = false;
@@ -39,7 +47,7 @@
 
     let embedScreen: EmbedScreen;
     let videoContainer: HTMLDivElement;
-    let videoElement: HTMLVideoElement;
+    let videoElement: HTMLVideoElementExt;
     let minimized = isMediaBreakpointOnly("md");
     let noVideoTimeout: ReturnType<typeof setTimeout> | undefined;
 
@@ -139,6 +147,7 @@
             }
 
             wasVideoEnabled = constraints?.video ?? false;
+            if (!wasVideoEnabled && isHightlighted) highlightedEmbedScreen.toggleHighlight(embedScreen);
             updateRatio();
         });
     });
@@ -215,14 +224,24 @@
             aspectRatio = videoElement != undefined ? videoElement.videoWidth / videoElement.videoHeight : 1;
         }, 1000);
     }
+
+    function hightlight() {
+        if (!clickable || !videoEnabled) return;
+        highlightedEmbedScreen.toggleHighlight(embedScreen);
+    }
 </script>
 
+<!-- svelte-ignore a11y-click-events-have-key-events -->
 <div
     class="video-container"
     class:video-off={!videoEnabled}
+    class:tw-h-full={videoEnabled && !isHightlighted && $embedScreenLayoutStore === LayoutMode.VideoChat}
     bind:this={videoContainer}
-    on:click={() => (clickable ? highlightedEmbedScreen.toggleHighlight(embedScreen) : null)}
+    on:click={() => analyticsClient.pinMeetingAction()}
+    on:click={() => hightlight()}
 >
+    <ActionMediaBox {embedScreen} trackStreamWraper={peer} {videoEnabled} />
+
     <div
         style={videoEnabled
             ? ""
@@ -251,6 +270,7 @@
             class:tw-w-0={!videoEnabled}
             class:object-contain={minimized || isHightlighted || aspectRatio < 1}
             class:tw-max-h-[230px]={videoEnabled && !isHightlighted}
+            class:tw-max-h-full={videoEnabled && !isHightlighted && $embedScreenLayoutStore === LayoutMode.VideoChat}
             class:tw-max-h-[80vh]={videoEnabled && isHightlighted}
             class:tw-h-full={videoEnabled}
             class:tw-rounded={videoEnabled}
@@ -300,12 +320,6 @@
                     <img draggable="false" src={microphoneOffImg} class="tw-flex tw-p-1 tw-h-8 tw-w-8" alt="Mute" />
                 </div>
             {/if}
-            <div
-                class="report-ban-container tw-flex tw-z-[600] media-box-camera-on-size media-box-camera-on-position
-            tw-translate-x-3 tw-transition-all tw-opacity-0 tw-w-full tw-h-full"
-            >
-                <BanReportBox {peer} />
-            </div>
         {:else}
             <span
                 style={$embedScreenLayoutStore === LayoutMode.VideoChat
@@ -330,9 +344,6 @@
                     class:tw-brightness-100={textColor === "white"}
                 />
             {/if}
-            <div class="tw-w-full tw-flex report-ban-container-cam-off tw-opacity-0 tw-h-10">
-                <BanReportBox {peer} />
-            </div>
         {/if}
     </div>
 </div>

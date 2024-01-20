@@ -134,6 +134,8 @@ import { SelectCompanionScene, SelectCompanionSceneName } from "../Login/SelectC
 import { scriptUtils } from "../../Api/ScriptUtils";
 import { requestedScreenSharingState } from "../../Stores/ScreenSharingStore";
 import { JitsiBroadcastSpace } from "../../Streaming/Jitsi/JitsiBroadcastSpace";
+import { notificationPlayingStore } from "../../Stores/NotificationStore";
+import { askDialogStore } from "../../Stores/MeetingStore";
 import { GameMapFrontWrapper } from "./GameMap/GameMapFrontWrapper";
 import { gameManager } from "./GameManager";
 import { EmoteManager } from "./EmoteManager";
@@ -207,6 +209,8 @@ export class GameScene extends DirtyScene {
     private connectionAnswerPromiseDeferred: Deferred<RoomJoinedMessageInterface>;
     // A promise that will resolve when the "create" method is called (signaling loading is ended)
     private createPromiseDeferred: Deferred<void>;
+    // A promise that will resolve when the scene is ready to start (all assets have been loaded and the connection to the room is established)
+    private sceneReadyToStartDeferred: Deferred<void> = new Deferred<void>();
     private iframeSubscriptionList!: Array<Subscription>;
     private gameMapChangedSubscription!: Subscription;
     private messageSubscription: Subscription | null = null;
@@ -877,6 +881,7 @@ export class GameScene extends DirtyScene {
         ])
             .then(() => {
                 this.hide(false);
+                this.sceneReadyToStartDeferred.resolve();
             })
             .catch((e) =>
                 console.error(
@@ -1092,14 +1097,14 @@ export class GameScene extends DirtyScene {
 
                 // When connection is performed, let's connect SimplePeer
                 //eslint-disable-next-line @typescript-eslint/no-this-alias
-                const me = this;
+                /*const me = this;
                 this.events.once("render", () => {
-                    if (me.connection) {
-                        this.simplePeer = new SimplePeer(me.connection);
-                    } else {
+                    if (me.connection) {*/
+                this.simplePeer = new SimplePeer(this.connection);
+                /*} else {
                         console.warn("Connection to peers not started!");
                     }
-                });
+                });*/
 
                 userMessageManager.setReceiveBanListener(this.bannedUser.bind(this));
 
@@ -1190,6 +1195,115 @@ export class GameScene extends DirtyScene {
                             broadcastService.joinSpace(megaphoneSettingsMessage.url);
                         }
                     }
+                });
+
+                // The muteMicrophoneSpaceUserMessage is completed in the RoomConnection. No need to unsubscribe.
+                //eslint-disable-next-line rxjs/no-ignored-subscription, svelte/no-ignored-unsubscribe
+                this.connection.muteMicrophoneMessage.subscribe(() => {
+                    notificationPlayingStore.playNotification(
+                        get(LL).notification.askToMuteMicrophone(),
+                        "microphone-off.png"
+                    );
+                    requestedMicrophoneState.disableMicrophone();
+                });
+
+                // The muteVideoSpaceUserMessage is completed in the RoomConnection. No need to unsubscribe.
+                //eslint-disable-next-line rxjs/no-ignored-subscription, svelte/no-ignored-unsubscribe
+                this.connection.muteVideoMessage.subscribe(() => {
+                    notificationPlayingStore.playNotification(get(LL).notification.askToMuteCamera(), "camera-off.png");
+                    requestedCameraState.disableWebcam();
+                });
+
+                // The muteMicrophoneEverybodySpaceUserMessage is completed in the RoomConnection. No need to unsubscribe.
+                //eslint-disable-next-line rxjs/no-ignored-subscription, svelte/no-ignored-unsubscribe
+                this.connection.muteMicrophoneEverybodyMessage.subscribe(() => {
+                    notificationPlayingStore.playNotification(
+                        get(LL).notification.askToMuteMicrophone(),
+                        "microphone-off.png"
+                    );
+                    requestedMicrophoneState.disableMicrophone();
+                });
+
+                // The muteVideoEverybodySpaceUserMessage is completed in the RoomConnection. No need to unsubscribe.
+                //eslint-disable-next-line rxjs/no-ignored-subscription, svelte/no-ignored-unsubscribe
+                this.connection.muteVideoEverybodyMessage.subscribe(() => {
+                    notificationPlayingStore.playNotification(get(LL).notification.askToMuteCamera(), "camera-off.png");
+                    requestedCameraState.disableWebcam();
+                });
+
+                // The askMuteVideoSpaceUserMessage is completed in the RoomConnection. No need to unsubscribe.
+                //eslint-disable-next-line rxjs/no-ignored-subscription, svelte/no-ignored-unsubscribe
+                this.connection.askMuteVideoMessage.subscribe((askMuteVideoMessage) => {
+                    notificationPlayingStore.playNotification(get(LL).notification.askToMuteCamera(), "camera-off.png");
+                    askDialogStore.addAskDialog(
+                        askMuteVideoMessage.userId,
+                        get(LL).notification.askToMuteCamera(),
+                        () => {
+                            requestedCameraState.disableWebcam();
+                        }
+                    );
+                });
+
+                // The askMuteMicrophoneSpaceUserMessage is completed in the RoomConnection. No need to unsubscribe.
+                //eslint-disable-next-line rxjs/no-ignored-subscription, svelte/no-ignored-unsubscribe
+                this.connection.askMuteMicrophoneMessage.subscribe((askMuteMicrophoneMessage) => {
+                    notificationPlayingStore.playNotification(
+                        get(LL).notification.askToMuteMicrophone(),
+                        "microphone-off.png"
+                    );
+                    askDialogStore.addAskDialog(
+                        askMuteMicrophoneMessage.userId,
+                        get(LL).notification.askToMuteMicrophone(),
+                        () => {
+                            requestedMicrophoneState.disableMicrophone();
+                        }
+                    );
+                });
+
+                // The mutedMessage is completed in the RoomConnection. No need to unsubscribe.
+                //eslint-disable-next-line rxjs/no-ignored-subscription, svelte/no-ignored-unsubscribe
+                this.connection.mutedMessage.subscribe(() => {
+                    notificationPlayingStore.playNotification(
+                        get(LL).notification.askToMuteMicrophone(),
+                        "microphone-off.png"
+                    );
+                    requestedMicrophoneState.disableMicrophone();
+                });
+
+                // The mutedVideoMessage is completed in the RoomConnection. No need to unsubscribe.
+                //eslint-disable-next-line rxjs/no-ignored-subscription, svelte/no-ignored-unsubscribe
+                this.connection.mutedVideoMessage.subscribe(() => {
+                    notificationPlayingStore.playNotification(get(LL).notification.askToMuteCamera(), "camera-off.png");
+                    requestedCameraState.disableWebcam();
+                });
+
+                // The askMutedMessage is completed in the RoomConnection. No need to unsubscribe.
+                //eslint-disable-next-line rxjs/no-ignored-subscription, svelte/no-ignored-unsubscribe
+                this.connection.askMutedMessage.subscribe((askMutedMessage) => {
+                    notificationPlayingStore.playNotification(
+                        get(LL).notification.askToMuteMicrophone(),
+                        "microphone-off.png"
+                    );
+                    askDialogStore.addAskDialog(
+                        askMutedMessage.userUuid,
+                        get(LL).notification.askToMuteMicrophone(),
+                        () => {
+                            requestedMicrophoneState.disableMicrophone();
+                        }
+                    );
+                });
+
+                // The askMutedVideoMessage is completed in the RoomConnection. No need to unsubscribe.
+                //eslint-disable-next-line rxjs/no-ignored-subscription, svelte/no-ignored-unsubscribe
+                this.connection.askMutedVideoMessage.subscribe((askMutedVideoMessage) => {
+                    notificationPlayingStore.playNotification(get(LL).notification.askToMuteCamera(), "camera-off.png");
+                    askDialogStore.addAskDialog(
+                        askMutedVideoMessage.userUuid,
+                        get(LL).notification.askToMuteCamera(),
+                        () => {
+                            requestedCameraState.disableWebcam();
+                        }
+                    );
                 });
 
                 this.connectionAnswerPromiseDeferred.resolve(onConnect.room);
@@ -1542,7 +1656,10 @@ export class GameScene extends DirtyScene {
         context.fillStyle = "#ffffff44";
         context.stroke();
         context.fill();
-        this.circleTexture.refresh();
+        // Phaser crashes in headless mode if we try to refresh the texture
+        if (this.game.renderer) {
+            this.circleTexture.refresh();
+        }
 
         //create red circle canvas use to create sprite
         texture = this.textures.createCanvas("circleSprite-red", 96, 96);
@@ -1559,7 +1676,10 @@ export class GameScene extends DirtyScene {
         contextRed.fillStyle = "#ff000044";
         contextRed.stroke();
         contextRed.fill();
-        this.circleRedTexture.refresh();
+        // Phaser crashes in headless mode if we try to refresh the texture
+        if (this.game.renderer) {
+            this.circleRedTexture.refresh();
+        }
     }
 
     private listenToIframeEvents(): void {
@@ -1908,6 +2028,12 @@ ${escapedMessage}
         this.iframeSubscriptionList.push(
             iframeListener.setAreaPropertyStream.subscribe((setProperty) => {
                 this.setAreaProperty(setProperty.areaName, setProperty.propertyName, setProperty.propertyValue);
+            })
+        );
+
+        this.iframeSubscriptionList.push(
+            iframeListener.banPlayerIframeEvent.subscribe((banPlayerEvent) => {
+                this.connection?.emitBanPlayerMessage(banPlayerEvent.uuid, banPlayerEvent.name);
             })
         );
 
@@ -3285,5 +3411,9 @@ ${escapedMessage}
 
     get room(): Room {
         return this._room;
+    }
+
+    get sceneReadyToStartPromise(): Promise<void> {
+        return this.sceneReadyToStartDeferred.promise;
     }
 }
