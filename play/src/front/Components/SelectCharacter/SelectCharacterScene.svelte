@@ -50,14 +50,14 @@
         on:click={() => analyticsClient.selectWoka()}
         on:click={cameraScene}>{$LL.woka.selectWoka.continue()}</button
     >
-    {#if $customizeAvailableStore}
+    <!--{#if $customizeAvailableStore}
         <button
             type="submit"
             class="outline tw-ml-2 selectCharacterSceneFormCustomYourOwnSubmit"
             on:click={() => analyticsClient.selectCustomWoka()}
             on:click={customizeScene}>{$LL.woka.selectWoka.customize()}</button
         >
-    {/if}
+    {/if}-->
 </section>
 
 <style lang="scss">

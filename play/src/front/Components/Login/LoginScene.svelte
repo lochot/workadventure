@@ -126,4 +126,7 @@
             <img src={poweredByWorkAdventureImg} alt="Powered by WorkAdventure" class="tw-h-14" />
         </section>
     {/if}
+    <div class="text-center tw-flex tw-h-fit tw-flex-col tw-justify-center tw-items-center">
+        Help
+    </div>
 </form>
