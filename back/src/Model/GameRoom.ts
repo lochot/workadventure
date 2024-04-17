@@ -1,40 +1,25 @@
 import path from "path";
+import * as Sentry from "@sentry/node";
+import { GameMapProperties, WAMFileFormat } from "@workadventure/map-editor";
+import { LocalUrlError } from "@workadventure/map-editor/src/LocalUrlError";
+import { mapFetcher } from "@workadventure/map-editor/src/MapFetcher";
 import {
+    EditMapCommandMessage,
     EmoteEventMessage,
+    isMapDetailsData,
     JoinRoomMessage,
+    MapBbbData,
+    MapDetailsData,
+    MapJitsiData,
+    MapThirdPartyData,
+    RefreshRoomMessage,
+    ServerToClientMessage,
     SetPlayerDetailsMessage,
     SubToPusherRoomMessage,
     VariableWithTagMessage,
-    ServerToClientMessage,
-    isMapDetailsData,
-    MapDetailsData,
-    MapThirdPartyData,
-    MapBbbData,
-    MapJitsiData,
-    RefreshRoomMessage,
-    EditMapCommandMessage,
 } from "@workadventure/messages";
-import { ITiledMap, ITiledMapProperty, Json } from "@workadventure/tiled-map-type-guard";
 import { Jitsi } from "@workadventure/shared-utils";
-import { mapFetcher } from "@workadventure/map-editor/src/MapFetcher";
-import { LocalUrlError } from "@workadventure/map-editor/src/LocalUrlError";
-import * as Sentry from "@sentry/node";
-import { GameMapProperties, WAMFileFormat } from "@workadventure/map-editor";
-import { PositionInterface } from "../Model/PositionInterface";
-import {
-    EmoteCallback,
-    EntersCallback,
-    LeavesCallback,
-    LockGroupCallback,
-    MovesCallback,
-    PlayerDetailsUpdatedCallback,
-} from "../Model/Zone";
-import { Movable } from "../Model/Movable";
-import { ProtobufUtils } from "../Model/Websocket/ProtobufUtils";
-import { EventSocket, RoomSocket, VariableSocket, ZoneSocket } from "../RoomManager";
-import { Admin } from "../Model/Admin";
-import { adminApi } from "../Services/AdminApi";
-import { VariablesManager } from "../Services/VariablesManager";
+import { ITiledMap, ITiledMapProperty, Json } from "@workadventure/tiled-map-type-guard";
 import {
     ADMIN_API_URL,
     BBB_SECRET,
@@ -49,16 +34,31 @@ import {
     SECRET_JITSI_KEY,
     STORE_VARIABLES_FOR_LOCAL_MAPS,
 } from "../Enum/EnvironmentVariable";
-import { emitError, emitErrorOnRoomSocket } from "../Services/MessageHelpers";
-import { VariableError } from "../Services/VariableError";
-import { ModeratorTagFinder } from "../Services/ModeratorTagFinder";
+import { Admin } from "../Model/Admin";
+import { Movable } from "../Model/Movable";
+import { PositionInterface } from "../Model/PositionInterface";
+import { ProtobufUtils } from "../Model/Websocket/ProtobufUtils";
+import {
+    EmoteCallback,
+    EntersCallback,
+    LeavesCallback,
+    LockGroupCallback,
+    MovesCallback,
+    PlayerDetailsUpdatedCallback,
+} from "../Model/Zone";
+import { EventSocket, RoomSocket, VariableSocket, ZoneSocket } from "../RoomManager";
+import { adminApi } from "../Services/AdminApi";
 import { MapLoadingError } from "../Services/MapLoadingError";
-import { MucManager } from "../Services/MucManager";
 import { getMapStorageClient } from "../Services/MapStorageClient";
+import { emitError, emitErrorOnRoomSocket } from "../Services/MessageHelpers";
+import { ModeratorTagFinder } from "../Services/ModeratorTagFinder";
+import { MucManager } from "../Services/MucManager";
+import { VariableError } from "../Services/VariableError";
+import { VariablesManager } from "../Services/VariablesManager";
 import { BrothersFinder } from "./BrothersFinder";
+import { Group } from "./Group";
 import { PositionNotifier } from "./PositionNotifier";
 import { User, UserSocket } from "./User";
-import { Group } from "./Group";
 import { PointInterface } from "./Websocket/PointInterface";
 
 export type ConnectCallback = (user: User, group: Group) => void;
@@ -218,9 +218,11 @@ export class GameRoom implements BrothersFinder {
         const [user] = users;
         return user;
     }
+
     public getUserById(id: number): User | undefined {
         return this.users.get(id);
     }
+
     public getUsersByUuid(uuid: string): Set<User> {
         return this.usersByUuid.get(uuid) ?? new Set();
     }
@@ -243,6 +245,7 @@ export class GameRoom implements BrothersFinder {
             joinRoomMessage.availabilityStatus,
             socket,
             joinRoomMessage.tag,
+            joinRoomMessage.canEdit,
             joinRoomMessage.visitCardUrl ?? null,
             joinRoomMessage.name,
             joinRoomMessage.characterTextures,
@@ -803,6 +806,25 @@ export class GameRoom implements BrothersFinder {
         return this.mapPromise;
     }
 
+    private wamPromise: Promise<WAMFileFormat> | undefined;
+
+    /**
+     * Returns a promise to the WAM file.
+     * @throws LocalUrlError if the map we are trying to load is hosted on a local network
+     * @throws Error
+     */
+    private getWam(): Promise<WAMFileFormat | undefined> {
+        if (!this._wamUrl) return Promise.resolve(undefined);
+        if (!this.wamPromise) {
+            this.wamPromise = mapFetcher.fetchWamFile(
+                this._wamUrl,
+                INTERNAL_MAP_STORAGE_URL,
+                PUBLIC_MAP_STORAGE_PREFIX
+            );
+        }
+        return this.wamPromise;
+    }
+
     private variableManagerPromise: Promise<VariablesManager> | undefined;
     private variableManagerLastLoad: Date | undefined;
 
@@ -870,8 +892,8 @@ export class GameRoom implements BrothersFinder {
      */
     public async getModeratorTagForJitsiRoom(jitsiRoom: string): Promise<string | undefined> {
         if (this.jitsiModeratorTagFinderPromise === undefined) {
-            this.jitsiModeratorTagFinderPromise = this.getMap()
-                .then((map) => {
+            this.jitsiModeratorTagFinderPromise = Promise.all([this.getMap(), this.getWam()])
+                .then(([map, wam]) => {
                     return new ModeratorTagFinder(
                         map,
                         (properties: ITiledMapProperty[]): { mainValue: string; tagValue: string } | undefined => {
@@ -907,7 +929,9 @@ export class GameRoom implements BrothersFinder {
                                 };
                             }
                             return undefined;
-                        }
+                        },
+                        this._roomUrl,
+                        wam
                     );
                 })
                 .catch((e) => {
@@ -1134,6 +1158,9 @@ export class GameRoom implements BrothersFinder {
             {
                 mapKey: this._wamUrl,
                 editMapCommandMessage: message,
+                connectedUserTags: user.tags,
+                userCanEdit: user.canEdit,
+                userUUID: user.uuid,
             },
             (err: unknown, editMapCommandMessage: EditMapCommandMessage) => {
                 if (err) {
@@ -1177,6 +1204,22 @@ export class GameRoom implements BrothersFinder {
                         this._wamSettings.megaphone =
                             editMapCommandMessage.editMapMessage.message.updateWAMSettingsMessage.message.updateMegaphoneSettingMessage;
                     }
+                }
+                if (editMapCommandMessage.editMapMessage?.message?.$case === "modifyAreaMessage") {
+                    // If the area is modified, we need to reset the WAM and the moderator tag finder.
+                    // So that the next call to getModeratorTagForJitsiRoom will reload the map and the WAM.
+                    // We also check if the settings like jitsi admin tag have been modified.
+                    // IMPROVE ME: We could imagine directly updating the jitsi admin tag in the finder moderator tag and don't have useless reloads or calls to get the WAM file.
+                    this.wamPromise = undefined;
+                    this.jitsiModeratorTagFinderPromise = undefined;
+                }
+                if (editMapCommandMessage.editMapMessage?.message?.$case === "modifyEntityMessage") {
+                    // If the area is modified, we need to reset the WAM and the moderator tag finder.
+                    // So that the next call to getModeratorTagForJitsiRoom will reload the map and the WAM.
+                    // We also check if the settings like jitsi admin tag have been modified.
+                    // IMPROVE ME: We could imagine directly updating the jitsi admin tag in the finder moderator tag and don't have useless reloads or calls to get the WAM file.
+                    this.wamPromise = undefined;
+                    this.jitsiModeratorTagFinderPromise = undefined;
                 }
                 this.dispatchRoomMessage({
                     message: {

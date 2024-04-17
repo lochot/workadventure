@@ -21,7 +21,12 @@ export class GameSceneUserInputHandler implements UserInputHandlerInterface {
         deltaY: number,
         deltaZ: number
     ): void {
-        this.gameScene.zoomByFactor(1 - (deltaY / 53) * 0.1);
+        // Calculate the velocity of the zoom
+        const velocity = deltaY / 53;
+        // Calculate the zoom factor
+        const zoomFactor = 1 - velocity * 0.1;
+        // Apply the zoom
+        this.gameScene.zoomByFactor(zoomFactor, velocity);
     }
 
     public handlePointerUpEvent(pointer: Phaser.Input.Pointer, gameObjects: Phaser.GameObjects.GameObject[]): void {
@@ -42,26 +47,25 @@ export class GameSceneUserInputHandler implements UserInputHandlerInterface {
             return;
         }
 
+        // If right click is disabled, we don't want to move the player
+        if (!this.gameScene.userInputManager.isRightClickEnabled) {
+            return;
+        }
+
         for (const object of gameObjects) {
             if (object instanceof Player || object instanceof RemotePlayer) {
                 return;
             }
         }
         const camera = this.gameScene.getCameraManager().getCamera();
-        const index = this.gameScene
-            .getGameMap()
-            .getTileIndexAt(pointer.x + camera.scrollX, pointer.y + camera.scrollY);
-        const startTile = this.gameScene
-            .getGameMap()
-            .getTileIndexAt(this.gameScene.CurrentPlayer.x, this.gameScene.CurrentPlayer.y);
         this.gameScene
-            .getPathfindingManager()
-            .findPath(startTile, index, true, true)
-            .then((path) => {
-                // Remove first step as it is for the tile we are currently standing on
-                path.shift();
-                this.gameScene.CurrentPlayer.setPathToFollow(path).catch(() => {});
-            })
+            .moveTo(
+                {
+                    x: pointer.x + camera.scrollX,
+                    y: pointer.y + camera.scrollY,
+                },
+                true
+            )
             .catch((reason) => {
                 console.warn(reason);
             });
@@ -72,9 +76,7 @@ export class GameSceneUserInputHandler implements UserInputHandlerInterface {
     public handlePointerMoveEvent(pointer: Phaser.Input.Pointer, gameObjects: Phaser.GameObjects.GameObject[]): void {}
 
     public handleKeyDownEvent(event: KeyboardEvent): KeyboardEvent {
-        if (get(mapEditorModeStore)) {
-            this.gameScene.getMapEditorModeManager()?.handleKeyDownEvent(event);
-        }
+        this.gameScene.getMapEditorModeManager()?.handleKeyDownEvent(event);
         switch (event.code) {
             case "KeyE": {
                 mapEditorModeStore.switchMode(!get(mapEditorModeStore));

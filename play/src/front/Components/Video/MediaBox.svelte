@@ -44,7 +44,7 @@
 {#if streamable instanceof VideoPeer}
     {#if $constraintStore || $statusStore === "error" || $statusStore === "connecting"}
         <div
-            class="media-container media-box-shape-color tw-pointer-events-auto screen-blocker"
+            class="media-container media-box-shape-color tw-pointer-events-auto screen-blocker tw-rounded-2xl"
             class:hightlighted={isHightlighted}
             class:tw-mr-6={isHightlighted && videoEnabled}
             class:tw-flex={!isHightlighted}
@@ -52,18 +52,13 @@
             class:media-box-camera-off-size={!isHightlighted && !videoEnabled}
             class:tw-max-w-sm={isHightlighted && !videoEnabled}
             class:tw-mx-auto={isHightlighted && !videoEnabled}
-            class:tw-m-auto={!isHightlighted && !videoEnabled}
             class:tw-h-12={!isHightlighted && !videoEnabled}
             class:clickable={isClickable}
             class:mozaic-duo={mozaicDuo}
             class:mozaic-full-width={mozaicSolo}
             class:mozaic-quarter={mozaicQuarter}
         >
-            <div
-                class="tw-w-full tw-flex screen-blocker tw-items-center"
-                class:tw-mx-auto={!isHightlighted}
-                class:tw-h-full={isHightlighted && videoEnabled}
-            >
+            <div class="tw-w-full tw-h-full tw-flex screen-blocker tw-items-center" class:tw-mx-auto={!isHightlighted}>
                 <VideoMediaBox peer={streamable} clickable={isClickable} {isHightlighted} />
             </div>
         </div>
@@ -90,20 +85,14 @@
         class:media-box-camera-on-size={!isHightlighted && streamable.getVideoTrack()}
         class:media-box-camera-off-size={!isHightlighted && !streamable.getVideoTrack()}
         class:tw-max-w-sm={isHightlighted && !streamable.getVideoTrack()}
-        class:tw-mx-auto={isHightlighted && !streamable.getVideoTrack()}
-        class:tw-m-auto={!isHightlighted && !streamable.getVideoTrack()}
         class:tw-h-12={!isHightlighted && !streamable.getVideoTrack()}
         class:clickable={isClickable}
-        class:mozaic-duo={mozaicDuo}
         class:mozaic-full-width={mozaicSolo}
+        class:mozaic-duo={mozaicDuo}
         class:mozaic-quarter={mozaicQuarter}
         transition:fly={{ x: 200, duration: 250 }}
     >
-        <div
-            class="tw-w-full tw-flex screen-blocker"
-            class:tw-mx-auto={!isHightlighted}
-            class:tw-h-full={isHightlighted && videoEnabled}
-        >
+        <div class="tw-w-full tw-h-full tw-flex screen-blocker" class:tw-mx-auto={!isHightlighted}>
             <JitsiMediaBox peer={streamable} clickable={isClickable} {isHightlighted} />
         </div>
     </div>
@@ -113,8 +102,8 @@
      media-box-shape-color
 "
         class:clickable={isClickable}
-        class:mozaic-duo={mozaicDuo}
         class:mozaic-full-width={mozaicSolo}
+        class:mozaic-duo={mozaicDuo}
         class:mozaic-quarter={mozaicQuarter}
     >
         <div class="{isHightlighted ? '' : 'tw-mx-auto'}   tw-w-full tw-h-full tw-flex screen-blocker">

@@ -2,7 +2,8 @@ import type { BaseTranslation } from "../i18n-types";
 
 const actionbar: BaseTranslation = {
     chat: "chat wočinić/začinić",
-    follow: "sćěhować/nic wjac sćěhować",
+    follow: "sćěhować",
+    unfollow: "nic wjac sćěhować",
     lock: "diskusiju zawrěć/wotewrić",
     screensharing: "přenošowanje wobrazowki startować/skónčić",
     layout: "napohlad kachlow přešaltować",
@@ -15,7 +16,6 @@ const actionbar: BaseTranslation = {
         microphone: "mikrofon",
         speaker: "wótřerěčak",
     },
-    app: "aplikacije wočinić/začinić",
 };
 
 export default actionbar;

@@ -1,25 +1,27 @@
 <script lang="ts">
     import type { Unsubscriber } from "svelte/store";
-    import { ChevronDownIcon, ChevronUpIcon, CheckIcon } from "svelte-feather-icons";
+    import { writable } from "svelte/store";
+    import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from "svelte-feather-icons";
     import { fly } from "svelte/transition";
     import { onDestroy, onMount } from "svelte";
-    import { writable } from "svelte/store";
     import { Subscription } from "rxjs";
+    import { AvailabilityStatus } from "@workadventure/messages";
     import { requestedScreenSharingState } from "../../Stores/ScreenSharingStore";
     import {
+        availabilityStatusStore,
         cameraListStore,
+        isSpeakerStore,
         microphoneListStore,
-        speakerListStore,
+        requestedCameraDeviceIdStore,
         requestedCameraState,
+        requestedMicrophoneDeviceIdStore,
         requestedMicrophoneState,
         silentStore,
+        speakerListStore,
         speakerSelectedStore,
-        requestedMicrophoneDeviceIdStore,
-        requestedCameraDeviceIdStore,
+        streamingMegaphoneStore,
         usedCameraDeviceIdStore,
         usedMicrophoneDeviceIdStore,
-        streamingMegaphoneStore,
-        isSpeakerStore,
     } from "../../Stores/MediaStore";
     import cameraImg from "../images/camera.png";
     import cameraOffImg from "../images/camera-off.png";
@@ -31,7 +33,7 @@
     import followImg from "../images/follow.png";
     import lockOpenImg from "../images/lock-opened.png";
     import lockCloseImg from "../images/lock-closed.png";
-    import mapBuilder from "../images/maps-builder.png";
+    import mapBuilder from "../images/maps-builder.svg";
     import screenshareOn from "../images/screenshare-on.png";
     import screenshareOff from "../images/screenshare-off.png";
     import emojiPickOn from "../images/emoji-on.png";
@@ -40,6 +42,7 @@
     import hammerImg from "../images/hammer.png";
     import megaphoneImg from "../images/megaphone.svg";
     import WorkAdventureImg from "../images/icon-workadventure-white.png";
+    import worldImg from "../images/world.svg";
     import { LayoutMode } from "../../WebRtc/LayoutManager";
     import { embedScreenLayoutStore } from "../../Stores/EmbedScreensStore";
     import { followRoleStore, followStateStore, followUsersStore } from "../../Stores/FollowStore";
@@ -48,21 +51,22 @@
     import { analyticsClient } from "../../Administration/AnalyticsClient";
     import { chatVisibilityStore, chatZoneLiveStore } from "../../Stores/ChatStore";
     import {
-        proximityMeetingStore,
         inExternalServiceStore,
         myCameraStore,
         myMicrophoneStore,
+        proximityMeetingStore,
     } from "../../Stores/MyMediaStore";
     import {
         activeSubMenuStore,
-        menuVisiblilityStore,
         inviteUserActivated,
+        menuVisiblilityStore,
         SubMenusInterface,
         subMenusStore,
         additionnalButtonsMenu,
         addClassicButtonActionBarEvent,
         addActionButtonActionBarEvent,
-        mapEditorActivated,
+        mapManagerActivated,
+        screenSharingActivatedStore,
     } from "../../Stores/MenuStore";
     import {
         emoteDataStore,
@@ -80,19 +84,25 @@
     import { peerStore } from "../../Stores/PeerStore";
     import { StringUtils } from "../../Utils/StringUtils";
     import Tooltip from "../Util/Tooltip.svelte";
-    import { modalIframeStore, modalVisibilityStore } from "../../Stores/ModalStore";
+    import {
+        modalIframeStore,
+        modalVisibilityStore,
+        showModalGlobalComminucationVisibilityStore,
+        roomListVisibilityStore,
+    } from "../../Stores/ModalStore";
     import { userHasAccessToBackOfficeStore } from "../../Stores/GameStore";
     import { AddButtonActionBarEvent } from "../../Api/Events/Ui/ButtonActionBarEvent";
     import { Emoji } from "../../Stores/Utils/emojiSchema";
     import {
-        megaphoneCanBeUsedStore,
         liveStreamingEnabledStore,
+        megaphoneCanBeUsedStore,
         requestedMegaphoneStore,
     } from "../../Stores/MegaphoneStore";
     import { layoutManagerActionStore } from "../../Stores/LayoutManagerStore";
     import { localUserStore } from "../../Connection/LocalUserStore";
     import { ADMIN_URL } from "../../Enum/EnvironmentVariable";
-    import MegaphoneConfirm from "./MegaphoneConfirm.svelte";
+
+    import AvailabilityStatusComponent from "./AvailabilityStatus/AvailabilityStatus.svelte";
 
     const menuImg = gameManager.currentStartedRoom?.miniLogo ?? WorkAdventureImg;
 
@@ -172,23 +182,28 @@
         }
     }
 
-    function toggleMegaphone() {
-        if ($streamingMegaphoneStore) {
-            streamingMegaphoneStore.set(false);
-            return;
-        }
-        if ($requestedMegaphoneStore || $liveStreamingEnabledStore) {
+    function toggleGlobalMessage() {
+        if ($requestedMegaphoneStore || $liveStreamingEnabledStore || $streamingMegaphoneStore) {
             analyticsClient.stopMegaphone();
             requestedMegaphoneStore.set(false);
+            streamingMegaphoneStore.set(false);
+            showModalGlobalComminucationVisibilityStore.set(false);
+            return;
+        }
+        if ($showModalGlobalComminucationVisibilityStore) {
+            showModalGlobalComminucationVisibilityStore.set(false);
             return;
         }
 
-        analyticsClient.startMegaphone();
-        streamingMegaphoneStore.set(true);
+        resetChatVisibility();
+        resetModalVisibility();
+        mapEditorModeStore.switchMode(false);
+        showModalGlobalComminucationVisibilityStore.set(true);
     }
 
     function toggleMapEditorMode() {
         if (isMobile) return;
+        if ($mapEditorModeStore) gameManager.getCurrentGameScene().getMapEditorModeManager().equipTool(undefined);
         analyticsClient.toggleMapEditor(!$mapEditorModeStore);
         mapEditorModeStore.switchMode(!$mapEditorModeStore);
     }
@@ -325,6 +340,7 @@
     function resetModalVisibility() {
         modalVisibilityStore.set(false);
         modalIframeStore.set(null);
+        showModalGlobalComminucationVisibilityStore.set(false);
     }
 
     /*function resetMenuVisibility() {
@@ -336,7 +352,7 @@
         chatVisibilityStore.set(false);
     }
 
-    function noDrag() {
+    function noDrag(): boolean {
         return false;
     }
 
@@ -360,6 +376,7 @@
     let subscribers = new Array<Unsubscriber>();
     let chatTotalMessagesSubscription: Subscription | undefined;
     let totalMessagesToSee = writable<number>(0);
+
     onMount(() => {
         chatTotalMessagesSubscription = iframeListener.chatTotalMessagesToSeeStream.subscribe((total) =>
             totalMessagesToSee.set(total)
@@ -385,9 +402,20 @@
             mapEditorModeStore.set(false);
         }
     });
+
+    function showRoomList() {
+        resetChatVisibility();
+        resetModalVisibility();
+
+        roomListVisibilityStore.set(true);
+    }
+
+    const onClickOutside = () => {
+        if ($emoteMenuSubStore) emoteMenuSubStore.closeEmoteMenu();
+    };
 </script>
 
-<svelte:window on:keydown={onKeyDown} />
+<svelte:window on:keydown={onKeyDown} on:click={onClickOutside} on:touchend={onClickOutside} />
 
 <div
     class="tw-flex tw-justify-center tw-m-auto tw-absolute tw-left-0 tw-right-0 tw-bottom-0"
@@ -411,10 +439,19 @@
                     on:click={() => analyticsClient.follow()}
                     on:click={followClick}
                 >
-                    <Tooltip text={$LL.actionbar.follow()} />
+                    {#if $followStateStore === "active"}
+                        <Tooltip text={$LL.actionbar.unfollow()} />
+                    {:else}
+                        <Tooltip text={$LL.actionbar.follow()} />
+                    {/if}
 
                     <button class:border-top-light={$followStateStore === "active"}>
-                        <img draggable="false" src={followImg} style="padding: 2px" alt="Toggle follow" />
+                        <img
+                            draggable="false"
+                            src={followImg}
+                            style="padding: 2px"
+                            alt={$followStateStore === "active" ? $LL.actionbar.unfollow() : $LL.actionbar.follow()}
+                        />
                     </button>
                 </div>
 
@@ -430,16 +467,16 @@
                         {#if $embedScreenLayoutStore === LayoutMode.Presentation}
                             <img
                                 draggable="false"
-                                src={layoutPresentationImg}
+                                src={layoutChatImg}
                                 style="padding: 2px"
-                                alt="Switch to mosaic mode"
+                                alt="Switch to presentation mode"
                             />
                         {:else}
                             <img
                                 draggable="false"
-                                src={layoutChatImg}
+                                src={layoutPresentationImg}
                                 style="padding: 2px"
-                                alt="Switch to presentation mode"
+                                alt="Switch to mosaic mode"
                             />
                         {/if}
                     </button>
@@ -477,10 +514,15 @@
                 >
                     <Tooltip text={$LL.actionbar.screensharing()} />
 
-                    <button class:border-top-light={$requestedScreenSharingState}>
+                    <button
+                        id="screenSharing"
+                        class:border-top-light={$requestedScreenSharingState}
+                        disabled={!$screenSharingActivatedStore}
+                    >
                         {#if $requestedScreenSharingState && !$silentStore}
                             <img
                                 draggable="false"
+                                class:disable-opacity={!$screenSharingActivatedStore}
                                 src={screenshareOn}
                                 style="padding: 2px;"
                                 alt="Stop screen sharing"
@@ -488,6 +530,7 @@
                         {:else}
                             <img
                                 draggable="false"
+                                class:disable-opacity={!$screenSharingActivatedStore}
                                 src={screenshareOff}
                                 style="padding: 2px;"
                                 alt="Start screen sharing"
@@ -500,7 +543,7 @@
 
         <div class="tw-flex tw-flex-row base-section animated tw-flex-wrap tw-justify-center">
             <div class="bottom-action-section tw-flex tw-flex-initial">
-                {#if !$inExternalServiceStore && !$silentStore && $proximityMeetingStore}
+                {#if !$inExternalServiceStore && !$silentStore && $proximityMeetingStore && ![AvailabilityStatus.BUSY, AvailabilityStatus.DO_NOT_DISTURB, AvailabilityStatus.BACK_IN_A_MOMENT].includes($availabilityStatusStore)}
                     {#if $myCameraStore}
                         <!-- svelte-ignore a11y-click-events-have-key-events -->
                         <div
@@ -515,7 +558,7 @@
                                 class="tooltiptext sm:tw-w-56 md:tw-w-96"
                                 class:border-top-light={$requestedCameraState}
                             >
-                                {#if $requestedCameraState && !$silentStore}
+                                {#if $requestedCameraState}
                                     <img
                                         draggable="false"
                                         src={cameraImg}
@@ -667,6 +710,7 @@
                 {/if}
 
                 {#if $isSpeakerStore || $streamingMegaphoneStore || $liveStreamingEnabledStore}
+                    <!-- svelte-ignore a11y-click-events-have-key-events -->
                     <div
                         class="tw-transition-all bottom-action-button"
                         on:click={() => analyticsClient.screenSharing()}
@@ -689,6 +733,34 @@
                                     src={screenshareOff}
                                     style="padding: 2px;"
                                     alt="Start screen sharing"
+                                />
+                            {/if}
+                        </button>
+                    </div>
+                {/if}
+
+                <!-- svelte-ignore a11y-click-events-have-key-events -->
+                {#if $isSpeakerStore && !$streamingMegaphoneStore}
+                    <div
+                        class="tw-transition-all bottom-action-button"
+                        on:click={() => analyticsClient.layoutPresentChange()}
+                        on:click={switchLayoutMode}
+                    >
+                        <Tooltip text={$LL.actionbar.layout()} />
+                        <button>
+                            {#if $embedScreenLayoutStore === LayoutMode.Presentation}
+                                <img
+                                    draggable="false"
+                                    src={layoutChatImg}
+                                    style="padding: 2px"
+                                    alt="Switch to presentation mode"
+                                />
+                            {:else}
+                                <img
+                                    draggable="false"
+                                    src={layoutPresentationImg}
+                                    style="padding: 2px"
+                                    alt="Switch to mosaic mode"
                                 />
                             {/if}
                         </button>
@@ -728,7 +800,7 @@
                     {/if}
                 </div>
                 <!-- svelte-ignore a11y-click-events-have-key-events -->
-                <div on:click={toggleEmojiPicker} class="bottom-action-button">
+                <div on:click|stopPropagation={toggleEmojiPicker} class="bottom-action-button">
                     <Tooltip text={$LL.actionbar.emoji()} />
 
                     <button class:border-top-light={$emoteMenuSubStore}>
@@ -737,19 +809,16 @@
                 </div>
                 {#if $megaphoneCanBeUsedStore && !$silentStore && ($myMicrophoneStore || $myCameraStore)}
                     <!-- svelte-ignore a11y-click-events-have-key-events -->
-                    <div on:click={toggleMegaphone} class="bottom-action-button tw-relative">
-                        {#if $streamingMegaphoneStore}
-                            <MegaphoneConfirm />
+                    <div on:click={toggleGlobalMessage} class="bottom-action-button tw-relative">
+                        {#if $liveStreamingEnabledStore}
+                            <Tooltip text={$LL.actionbar.disableMegaphone()} />
                         {:else}
-                            <Tooltip
-                                text={$liveStreamingEnabledStore
-                                    ? $LL.actionbar.disableMegaphone()
-                                    : $LL.actionbar.enableMegaphone()}
-                            />
+                            <Tooltip text={$LL.actionbar.globalMessage()} />
                         {/if}
 
                         <button
-                            class:border-top-warning={$liveStreamingEnabledStore || $streamingMegaphoneStore}
+                            class:border-top-warning={$liveStreamingEnabledStore}
+                            class:border-top-light={$showModalGlobalComminucationVisibilityStore}
                             id="megaphone"
                         >
                             <img draggable="false" src={megaphoneImg} style="padding: 2px" alt="Toggle megaphone" />
@@ -782,34 +851,33 @@
                         <img draggable="false" src={menuImg} style="padding: 2px" alt={$LL.menu.icon.open.menu()} />
                     </button>
                 </div>
-                {#if $mapEditorActivated}
-                    <!-- svelte-ignore a11y-click-events-have-key-events -->
-                    <div
-                        on:dragstart|preventDefault={noDrag}
-                        on:click={toggleMapEditorMode}
-                        class="bottom-action-button"
+            </div>
+            <div class="bottom-action-section tw-flex tw-flex-initial">
+                <AvailabilityStatusComponent />
+            </div>
+            <div class="bottom-action-section tw-flex tw-flex-initial">
+                <!-- svelte-ignore a11y-click-events-have-key-events -->
+                <div on:dragstart|preventDefault={noDrag} on:click={toggleMapEditorMode} class="bottom-action-button">
+                    {#if isMobile || !$mapManagerActivated}
+                        <Tooltip text={$LL.actionbar.mapEditorMobileLocked()} />
+                    {:else}
+                        <Tooltip text={$LL.actionbar.mapEditor()} />
+                    {/if}
+                    <button
+                        id="mapEditorIcon"
+                        class:border-top-light={$mapEditorModeStore && !isMobile}
+                        name="toggle-map-editor"
+                        disabled={isMobile || !$mapManagerActivated}
                     >
-                        {#if isMobile}
-                            <Tooltip text={$LL.actionbar.mapEditorMobileLocked()} />
-                        {:else}
-                            <Tooltip text={$LL.actionbar.mapEditor()} />
-                        {/if}
-                        <button
-                            id="mapEditorIcon"
-                            class:border-top-light={$mapEditorModeStore && !isMobile}
-                            name="toggle-map-editor"
-                            disabled={isMobile}
-                        >
-                            <img
-                                draggable="false"
-                                src={mapBuilder}
-                                class:disable-opacity={isMobile}
-                                style="padding: 2px"
-                                alt="toggle-map-editor"
-                            />
-                        </button>
-                    </div>
-                {/if}
+                        <img
+                            draggable="false"
+                            src={mapBuilder}
+                            class:disable-opacity={isMobile || !$mapManagerActivated}
+                            style="padding: 2px"
+                            alt="toggle-map-editor"
+                        />
+                    </button>
+                </div>
                 {#if $userHasAccessToBackOfficeStore}
                     <!-- svelte-ignore a11y-click-events-have-key-events -->
                     <div
@@ -825,6 +893,25 @@
                         </button>
                     </div>
                 {/if}
+            </div>
+
+            <div class="bottom-action-section tw-flex tw-flex-initial">
+                <!-- TODO button hep -->
+                <!-- Room list button -->
+                <!-- svelte-ignore a11y-click-events-have-key-events -->
+                <div
+                    on:dragstart|preventDefault={noDrag}
+                    on:click={() => analyticsClient.openedRoomList()}
+                    on:click={showRoomList}
+                    class="bottom-action-button"
+                >
+                    <Tooltip text={$LL.actionbar.roomList()} />
+
+                    <button id="roomListIcon" class:border-top-light={$roomListVisibilityStore}>
+                        <!-- svelte-ignore a11y-img-redundant-alt -->
+                        <img draggable="false" src={worldImg} style="padding: 2px" alt="Image for room list modal" />
+                    </button>
+                </div>
             </div>
 
             {#if $addActionButtonActionBarEvent.length > 0}
@@ -965,7 +1052,6 @@
 
 <style lang="scss">
     @import "../../style/breakpoints.scss";
-
     button {
         justify-content: center;
     }

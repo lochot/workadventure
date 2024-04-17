@@ -7,6 +7,8 @@ const mapEditor: DeepPartial<Translation["mapEditor"]> = {
         entityEditor: "Entitu wobźěłaś",
         tileEditor: "Kachlu wobźěłaś",
         trashEditor: "Zbórk",
+        closeMapEditor: "Mapu zacyniś",
+        mapManagerActivated: "Mapowy manager je aktiwěrowany",
     },
     properties: {
         silentProperty: {
@@ -79,6 +81,7 @@ const mapEditor: DeepPartial<Translation["mapEditor"]> = {
             errorInvalidUrl: 'Njepłaśeca URL. Wóna musy se zachopiś z "http://" oder "https://".',
             findOutMoreHere: "How zgónijośo wěcej",
             openPickerSelector: "Wuzwóleński wuběraŕ wótcyniś",
+            forcedInNewTab: "W nowem woknje wótcyniś",
         },
         advancedOptions: "Rozšyrjone opcije",
         speakerMegaphoneProperties: {
@@ -153,6 +156,10 @@ const mapEditor: DeepPartial<Translation["mapEditor"]> = {
     areaEditor: {
         editInstructions: "Klikniśo na wobceŕk, aby jogo kakosći pśeměnili.",
         nameLabel: "Mě",
+        nameLabelPlaceholder: "Mě",
+        areaDescription: "Pśedpokładny opis",
+        areaDescriptionPlaceholder: "Pśedpokładny opis",
+        addDescriptionField: "Opis pśidaś",
     },
     entityEditor: {
         itemPicker: {
@@ -167,6 +174,11 @@ const mapEditor: DeepPartial<Translation["mapEditor"]> = {
         buttonLabel: "Wopismo bublina",
         editInstructions: "Klikniśo na objekt, aby jogo kakosći pśeměnili.",
         selectObject: "Klikniśo na objekt, aby jen wuzwólili",
+        objectName: "Mě",
+        objectNamePlaceholder: "Mě",
+        objectDescription: "Pśedpokładny opis",
+        objectDescriptionPlaceholder: "Pśedpokładny opis",
+        addDescriptionField: "Opis pśidaś",
     },
     settings: {
         loading: "Lodujo se...",

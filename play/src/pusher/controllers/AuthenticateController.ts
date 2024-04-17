@@ -152,7 +152,8 @@ export class AuthenticateController extends BaseHttpController {
                     IPAddress,
                     localStorageCharacterTextureIds ?? [],
                     localStorageCompanionTextureId,
-                    req.header("accept-language")
+                    req.header("accept-language"),
+                    authTokenData.tags
                 );
 
                 if (resUserData.status === "error") {
@@ -246,7 +247,7 @@ export class AuthenticateController extends BaseHttpController {
             if (!playUri) {
                 throw new Error("Missing playUri in cookies");
             }
-            //user have not token created, check data on hydra and create token
+
             let userInfo = null;
             try {
                 userInfo = await openIDClient.getUserInfo(req, res);
@@ -268,7 +269,8 @@ export class AuthenticateController extends BaseHttpController {
                 email,
                 userInfo?.access_token,
                 userInfo?.username,
-                userInfo?.locale
+                userInfo?.locale,
+                userInfo?.tags
             );
 
             res.atomic(() => {

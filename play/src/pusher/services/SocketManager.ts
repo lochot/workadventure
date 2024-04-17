@@ -33,9 +33,14 @@ import {
     MegaphoneStateMessage,
     UpdateSpaceMetadataMessage,
     BanPlayerMessage,
+    SearchMemberQuery,
+    SearchMemberAnswer,
+    MemberData,
+    GetMemberQuery,
+    GetMemberAnswer,
 } from "@workadventure/messages";
 import * as Sentry from "@sentry/node";
-import axios, { isAxiosError } from "axios";
+import axios, { AxiosResponse, isAxiosError } from "axios";
 import { z } from "zod";
 import { PusherRoom } from "../models/PusherRoom";
 import type { BackSpaceConnection, SocketData } from "../models/Websocket/SocketData";
@@ -1105,6 +1110,26 @@ export class SocketManager implements ZoneEventListener {
         socketData.backConnection.write(pusherToBackMessage);
     }
 
+    forwardAdminMessageToBack(client: Socket, message: PusherToBackMessage["message"]): void {
+        const socketData = client.getUserData();
+        if (!socketData.canEdit) {
+            Sentry.captureException(
+                new Error(`Security exception, the client tried to update the map: ${JSON.stringify(socketData)}`)
+            );
+            // Emit error message
+            socketData.emitInBatch({
+                message: {
+                    $case: "errorMessage",
+                    errorMessage: {
+                        message: "You are not allowed to edit the map",
+                    },
+                },
+            });
+            return;
+        }
+        this.forwardMessageToBack(client, message);
+    }
+
     emitXMPPSettings(client: Socket): void {
         const socketData = client.getUserData();
         const xmppSettings: XmppSettingsMessage = {
@@ -1296,11 +1321,11 @@ export class SocketManager implements ZoneEventListener {
     async handleRoomsFromSameWorldQuery(client: Socket, queryMessage: QueryMessage) {
         let roomDescriptions: ShortMapDescription[];
         try {
-            roomDescriptions = await adminService.getUrlRoomsFromSameWorld(client.getUserData().roomId);
-        } catch (e) {
-            console.warn("SocketManager => handleRoomsFromSameWorldQuery => error while getting other rooms list", e);
-            // Nothing to do with the error
-            Sentry.captureException(e);
+            roomDescriptions = await adminService.getUrlRoomsFromSameWorld(
+                client.getUserData().roomId,
+                undefined,
+                client.getUserData().tags
+            );
             client.send(
                 ServerToClientMessage.encode({
                     message: {
@@ -1308,9 +1333,19 @@ export class SocketManager implements ZoneEventListener {
                         answerMessage: {
                             id: queryMessage.id,
                             answer: {
-                                $case: "error",
-                                error: {
-                                    message: e instanceof Error ? e.message + e.stack : "Unknown error",
+                                $case: "roomsFromSameWorldAnswer",
+                                roomsFromSameWorldAnswer: {
+                                    roomDescriptions: roomDescriptions.map((room) => ({
+                                        ...room,
+                                        name: room.name ?? "",
+                                        roomUrl: room.roomUrl ?? "",
+                                        description: room.description ?? undefined, // Add this line to ensure description is not null
+                                        wamUrl: room.wamUrl ?? undefined, // Add this line to ensure wamUrl is not null
+                                        copyright: room.copyright ?? undefined, // Add this line to ensure copyright is not null
+                                        thumbnail: room.thumbnail ?? undefined, // Add this line to ensure thumbnail is not null
+                                        areasSearchable: room.areasSearchable ?? undefined, // Add this line to ensure areasSearchable is not null
+                                        entitiesSearchable: room.entitiesSearchable ?? undefined, // Add this line to ensure entitiesSearchable is not null
+                                    })),
                                 },
                             },
                         },
@@ -1318,25 +1353,34 @@ export class SocketManager implements ZoneEventListener {
                 }).finish(),
                 true
             );
-            return;
-        }
-        client.send(
-            ServerToClientMessage.encode({
-                message: {
-                    $case: "answerMessage",
-                    answerMessage: {
-                        id: queryMessage.id,
-                        answer: {
-                            $case: "roomsFromSameWorldAnswer",
-                            roomsFromSameWorldAnswer: {
-                                roomDescriptions,
+        } catch (e) {
+            console.warn("SocketManager => handleRoomsFromSameWorldQuery => error while getting other rooms list", e);
+            try {
+                client.send(
+                    ServerToClientMessage.encode({
+                        message: {
+                            $case: "answerMessage",
+                            answerMessage: {
+                                id: queryMessage.id,
+                                answer: {
+                                    $case: "error",
+                                    error: {
+                                        message: e instanceof Error ? e.message + e.stack : "Unknown error",
+                                    },
+                                },
                             },
                         },
-                    },
-                },
-            }).finish(),
-            true
-        );
+                    }).finish(),
+                    true
+                );
+                // Nothing to do with the error
+                Sentry.captureException(e);
+                return;
+            } catch (e) {
+                Sentry.captureException(e);
+                console.warn("SocketManager => handleRoomsFromSameWorldQuery => error while sending error message", e);
+            }
+        }
     }
 
     handleLeaveSpace(client: Socket, spaceName: string) {
@@ -1401,16 +1445,30 @@ export class SocketManager implements ZoneEventListener {
             }
         };
 
+        const isAllowed = (response: AxiosResponse) => {
+            const headers = response.headers;
+            if (!headers) {
+                return true;
+            }
+            let xFrameOption = headers["x-frame-options"];
+            if (!xFrameOption) {
+                return true;
+            }
+            xFrameOption = xFrameOption.toLowerCase();
+
+            return xFrameOption !== "deny" && xFrameOption !== "sameorigin";
+        };
+
         await axios
             .head(url, { timeout: 5_000 })
             // Klaxoon
-            .then((response) => emitAnswerMessage(true, !response.headers["x-frame-options"]))
+            .then((response) => emitAnswerMessage(true, isAllowed(response)))
             .catch(async (error) => {
                 // If response from server is "Method not allowed", we try to do a GET request
                 if (isAxiosError(error) && error.response?.status === 405) {
                     await axios
                         .get(url, { timeout: 5_000 })
-                        .then((response) => emitAnswerMessage(true, !response.headers["x-frame-options"]))
+                        .then((response) => emitAnswerMessage(true, isAllowed(response)))
                         .catch((error) => processError(error));
                 } else {
                     processError(error);
@@ -1491,6 +1549,30 @@ export class SocketManager implements ZoneEventListener {
             return;
         }
         space.muteVideoEverybodyUser(socketData, participantId);
+    }
+
+    async handleSearchMemberQuery(client: Socket, searchMemberQuery: SearchMemberQuery): Promise<SearchMemberAnswer> {
+        const { roomId } = client.getUserData();
+        const members = await adminService.searchMembers(roomId, searchMemberQuery.searchText);
+        return {
+            members: members.map((member: MemberData) => ({
+                name: member.name ?? undefined,
+                id: member.id,
+                email: member.email ?? undefined,
+            })),
+        };
+    }
+
+    async handleGetMemberQuery(getMemberQuery: GetMemberQuery): Promise<GetMemberAnswer> {
+        const memberFromApi = await adminService.getMember(getMemberQuery.uuid);
+        return {
+            member: {
+                id: memberFromApi.id,
+                name: memberFromApi.name ?? undefined,
+                email: memberFromApi.email ?? undefined,
+                visitCardUrl: memberFromApi.visitCardUrl ?? undefined,
+            },
+        };
     }
 }
 

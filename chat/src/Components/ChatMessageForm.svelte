@@ -18,6 +18,8 @@
     import {
         EraserException,
         EraserService,
+        ExcalidrawException,
+        ExcalidrawService,
         GoogleWorkSpaceException,
         GoogleWorkSpaceService,
         KlaxoonEvent,
@@ -68,6 +70,9 @@
         image?: string;
         link?: string;
         error?: string;
+        targetEmbedableUrl?: string;
+        regexUrl?: string;
+        forceNewTab?: boolean;
     }
     const applicationsSelected = writable<Set<Application>>(new Set());
     const applications = writable<Set<Application>>(new Set());
@@ -372,7 +377,7 @@
                 break;
             case "Eraser":
                 try {
-                    EraserService.validateEraserLink(new URL(app.link));
+                    EraserService.validateLink(new URL(app.link));
                 } catch (err) {
                     if (err instanceof EraserException.EraserLinkException) {
                         app.error = $LL.form.application.eraser.error();
@@ -382,8 +387,47 @@
                     app.link = undefined;
                 }
                 break;
+            case "Excalidraw":
+                try {
+                    ExcalidrawService.validateLink(new URL(app.link), chatConnectionManager.excalidrawToolDomains);
+                } catch (err) {
+                    if (err instanceof ExcalidrawException.ExcalidrawException) {
+                        app.error = $LL.form.application.excalidraw.error();
+                    } else {
+                        app.error = $LL.form.application.weblink.error();
+                    }
+                    app.link = undefined;
+                }
+                break;
             default:
-                throw new Error("Application not found");
+                if (app.regexUrl) {
+                    const regexUrl = new URL(app.regexUrl);
+                    const regex = new RegExp(app.regexUrl.replace("?", "[?]"));
+                    if (app.link.indexOf(regexUrl.host) != -1) {
+                        // if property has "targetEmbedableLink" transform the link to embedable link with regex
+                        if (app.targetEmbedableUrl) {
+                            const matches = regex.exec(app.link);
+                            if (matches) {
+                                app.link = app.targetEmbedableUrl.replace(/\$[0-9]+/g, (match) => {
+                                    const index = parseInt(match.substring(1));
+                                    return matches[index] ?? "";
+                                });
+                            }
+                        }
+                    } else if (app.targetEmbedableUrl) {
+                        const url = new URL(app.link);
+                        if (app.targetEmbedableUrl?.indexOf(url.host) == -1) {
+                            // If the link exists but is not the same of embedable link target, their is an error
+                            app.error = $LL.form.application.weblink.error();
+                            app.link = undefined;
+                        }
+                    } else {
+                        // If the link exists but is not the same of embedable link target, their is an error
+                        app.error = $LL.form.application.weblink.error();
+                        app.link = undefined;
+                    }
+                }
+                break;
         }
         applicationsSelected.update((apps) => {
             apps.add(app);
@@ -506,6 +550,33 @@
                 return apps;
             });
         }
+        if (chatConnectionManager.excalidrawToolIsActivated) {
+            applications.update((apps) => {
+                apps.add({
+                    name: "Excalidraw",
+                    icon: "./static/images/applications/excalidraw.svg",
+                    example: "https://excalidraw.com/#room=ExSd8Z4wPsaqMMgTN4VU",
+                    description: $LL.form.application.excalidraw.description(),
+                });
+                return apps;
+            });
+        }
+
+        if (chatConnectionManager.applications.length > 0) {
+            applications.update((apps) => {
+                chatConnectionManager.applications.forEach((app) => {
+                    apps.add({
+                        name: app.name,
+                        icon: app.image ?? "",
+                        example: app.doc ?? "",
+                        description: app.description ?? "",
+                        targetEmbedableUrl: app.targetUrl,
+                        regexUrl: app.regexUrl,
+                    });
+                });
+                return apps;
+            });
+        }
     });
 
     /* eslint-disable svelte/require-each-key */
@@ -513,6 +584,7 @@
 
 <div class="wa-message-form" bind:this={messageForm}>
     {#if $selectedMessageToReply}
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
         <div class="replyMessage" on:click={() => selectedMessageToReply.set(null)}>
             <div
                 style={`border-bottom-color:${getColor($selectedMessageToReply.name)}`}
@@ -555,6 +627,7 @@
     {#if usersSearching.length > 0}
         <div class="wa-dropdown-menu">
             {#each usersSearching as user (user.jid)}
+                <!-- svelte-ignore a11y-click-events-have-key-events -->
                 <span
                     class="wa-dropdown-item user-tag"
                     on:click|stopPropagation|preventDefault={() => addUserTag(user)}
@@ -568,7 +641,7 @@
 
     {#each [...$applicationsSelected] as app (app.name)}
         <div
-            class="tw-flex tw-flex-column tw-items-center tw-justify-center tw-mx-12 tw-mb-2 tw-p-3 tw-flex tw-flex-wrap tw-rounded-xl tw-text-xxs tw-bottom-12"
+            class="tw-flex tw-flex-column tw-items-center tw-justify-center tw-mx-12 tw-mb-2 tw-p-3 tw-flex-wrap tw-rounded-xl tw-text-xxs tw-bottom-12"
             style="backdrop-filter: blur(30px);border: solid 1px rgb(27 27 41);"
         >
             <div class="tw-flex tw-flex-row tw-justify-between tw-items-center tw-m-1 tw-w-full">
@@ -632,9 +705,12 @@
                                     {$LL.file.notLogged()}
                                 {:else if fileUploaded.errorMessage === "disabled"}
                                     {$LL.disabled()}
+                                {:else}
+                                    {fileUploaded.errorMessage}
                                 {/if}
                             </p>
                             {#if fileUploaded.errorMessage === "not-logged"}
+                                <!-- svelte-ignore a11y-click-events-have-key-events -->
                                 <div
                                     class="tw-text-light-blue tw-cursor-pointer"
                                     on:click|preventDefault|stopPropagation={() => iframeListener.sendLogin()}
@@ -660,6 +736,7 @@
                         {#if fileUploaded.uploadState === uploadingState.finish}
                             <CheckIcon size="14" class="tw-text-pop-green" />
                         {:else if fileUploaded.uploadState === uploadingState.error}
+                            <!-- svelte-ignore a11y-click-events-have-key-events -->
                             <div
                                 class="alert-upload tw-cursor-pointer"
                                 on:click|preventDefault|stopPropagation={() => resend()}
@@ -684,6 +761,7 @@
                 </div>
             {/each}
             {#if informationMessage}
+                <!-- svelte-ignore a11y-click-events-have-key-events -->
                 <div
                     class="tw-flex tw-flex-wrap tw-bg-dark-blue/95 tw-rounded-3xl tw-py-2 tw-text-xs tw-items-center tw-px-4 tw-text-warning tw-w-full tw-mb-1 tw-cursor-pointer"
                     on:click|preventDefault|stopPropagation={() => (informationMessage = null)}

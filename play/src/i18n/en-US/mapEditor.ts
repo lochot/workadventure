@@ -10,6 +10,9 @@ const mapEditor: BaseTranslation = {
         tileEditor: "Tile editor tool",
         configureMyRoom: "Configure my room",
         trashEditor: "Trash",
+        exploreTheRoom: "Explore the room",
+        closeMapEditor: "Close map editor",
+        mapManagerActivated: "Map manager activated",
     },
     properties: {
         silentProperty: {
@@ -48,6 +51,7 @@ const mapEditor: BaseTranslation = {
                 addConfig: "Add an option",
                 startWithAudioMuted: "Start with microphone muted",
                 startWithVideoMuted: "Start with video closed",
+                jitsiRoomAdminTag: "Moderator tag for the meeting room",
                 cancel: "Cancel",
                 validate: "Validate",
             },
@@ -84,6 +88,7 @@ const mapEditor: BaseTranslation = {
             errorInvalidUrl: 'Please enter a valid URL (starting with "https://")',
             findOutMoreHere: "Find out more here",
             openPickerSelector: "Open picker selector",
+            forcedInNewTab: "Forced in new tab",
         },
         advancedOptions: "Advanced Options",
         speakerMegaphoneProperties: {
@@ -113,6 +118,7 @@ const mapEditor: BaseTranslation = {
             description: "Where people can exit the map to another one.",
             exitMap: "Exit map",
             exitMapStartAreaName: "Start area name",
+            defaultStartArea: "Default start area",
         },
         youtubeProperties: {
             label: "Open Youtube Video",
@@ -157,16 +163,59 @@ const mapEditor: BaseTranslation = {
             error: "Please enter a valid Google Drive URL",
             disabled: "Google Drive integration is disabled.",
         },
+        restrictedRightsProperties: {
+            label: "Add rights",
+            rightTitle: "Access / edition rights by user tag",
+            rightDescription:
+                "Rights define who can interact with the area. If you leave it empty, everyone can use it. If you set it, only users who have at least one of these 'tags' can use it.",
+            rightWriteTitle: "Edition rights",
+            rightWriteDescription:
+                "Edition rights define who can modify the area. Users matching one of these tags can create, update or delete an object in the area.",
+            rightReadTitle: "Access rights",
+            rightReadDescription:
+                "Access rights define who can interact with the area. Users matching one of these tags can enter the area and use objects whithin the area.",
+        },
+        personalAreaConfiguration: {
+            label: "Personal area",
+            description:
+                "Users can claim personal areas as their own space. As an administrator, you can set/revoke ownership of an area",
+            accessClaimMode: "Access claim mode",
+            dynamicAccessClaimMode: "Dynamic",
+            staticAccessClaimMode: "Static",
+            dynamicAccessDescription: "Anyone with appropriate user tags can claim the property of the zone.",
+            staticAccessDescription: "Manually define the owner of the zone.",
+            allowedTags: "Allowed user tags",
+            allowedUser: "Allowed user",
+            owner: "Owner",
+            revokeAccess: "Revoke access",
+        },
+        excalidrawProperties: {
+            label: "Open Excalidraw",
+            description: "An open source virtual hand-drawn style whiteboard. Collaborative and end-to-end encrypted.",
+            error: "Please enter a valid Excalidraw URL",
+            disabled: "Excalidraw integration is disabled.",
+        },
     },
     areaEditor: {
         editInstructions: "Click an area to modify its properties.",
         nameLabel: "Name",
+        nameLabelPlaceholder: "MyArea",
+        areaDescription: "Description",
+        areaDescriptionPlaceholder: "My area is a...",
+        areaSerchable: "Searchable in the exploration mode",
+        addDescriptionField: "Add description field",
     },
     areaEditorInstructions: {
         title: "How it works ?",
         description: "Draw a zone on the map to create a new one.",
     },
     entityEditor: {
+        header: {
+            title: "Add object to your map",
+            description: "Search, upload or select existing object and add it in the map.",
+        },
+        title: "Put your object",
+        editing: "Editing: {name}",
         itemPicker: {
             searchPlaceholder: "Search",
             backToSelectObject: "Back to select object",
@@ -179,6 +228,42 @@ const mapEditor: BaseTranslation = {
         buttonLabel: "Button Label",
         editInstructions: "Click an entity to modify its properties.",
         selectObject: "Click on an object to select it",
+        objectName: "Object Name",
+        objectNamePlaceholder: "MyObject",
+        objectDescription: "Object Description",
+        objectDescriptionPlaceholder: "My object is a...",
+        objectSearchable: "Searchable in the exploration mode",
+        addDescriptionField: "Add description field",
+        uploadEntity: {
+            title: "Add your image",
+            description: "Drag and drop or choose your image to add it in the map",
+            dragDrop: "Drag and Drop or",
+            chooseFile: "Choose file",
+            errorOnFileFormat: "File format not supported",
+            errorOnFileNumber: "Multiple file drop is not supported",
+        },
+        images: "Image{{s}}",
+        noImage: "No image",
+        customEntityEditorForm: {
+            imageName: "Image name",
+            tags: "Tags",
+            objectType: "Object type",
+            floatingObject: "Floating object",
+            floatingObjectDescription:
+                "A floating object can be placed freely on the map. Otherwise, it will be aligned on the map grid.",
+            depth: "Depth",
+            groundLevel: "Ground level",
+            custom: "Custom",
+            standing: "Standing",
+        },
+        buttons: {
+            editEntity: "Edit",
+            back: "Back",
+            cancel: "Cancel",
+            delete: "Delete",
+            save: "Save",
+            upload: "Upload",
+        },
     },
     settings: {
         loading: "Loading",
@@ -205,6 +290,72 @@ const mapEditor: BaseTranslation = {
                 },
             },
         },
+        room: {
+            title: "Room Settings",
+            description: "Configure your room",
+            inputs: {
+                name: "Room name",
+                description: "Room description",
+                tags: "Tags",
+                copyright: "Room license",
+                thumbnail: "Room thumbnail",
+            },
+            helps: {
+                description: "A description of the map. Can be used in social networks when sharing a link to the map.",
+                tags: "A list of tags. Can be used to grant access to the map.",
+                thumbnail:
+                    "URL to a thumbnail image. This image will be used in social networks when sharing a link to the map.",
+                copyright:
+                    "Copyright notice for this map. Can be a link to a license. Parts of this map like tilesets or images can have their own copyright.",
+            },
+            actions: {
+                save: "Save",
+                confirm: "Confirm",
+                success: "Room settings saved",
+                error: "Error while saving room settings",
+            },
+            confirmSave:
+                "Confirm that you want to save the changes to the map. This will create a new version of the map, disconnect all players and reload the map for all players.",
+        },
+    },
+    explorer: {
+        title: "Explore the room",
+        description:
+            "Allow to explore the room. You be able to move around the room and interact with objects. 2 mode are available: 'Exploration' and 'Search'. The 'Search mode' mode will propose you to search or filter entities and areas in the room. The 'Exploration mode' mode will let you move freely in the room.",
+        explorationModeTitle: "Exploration mode",
+        explorationModeDescription: "Move freely in the room and explore the different areas and entities 🗺️",
+        searchModeTitle: "Search mode",
+        searchModeDescription: "Search or filter entities and areas in the room 🧐",
+        noEntitiesFound: "No entity found in the room 🙅‍♂️",
+        entitiesFound: "object{{s}} found",
+        noAreasFound: "No area found in the room 🙅‍♀️",
+        areasFound: "area{{s}} found",
+        noDescriptionFound: "No description found 🫥",
+        details: {
+            close: "Close",
+            moveToEntity: "Move to entity {name}",
+            moveToArea: "Move to area {name}",
+        },
+        popup: {
+            title: "Do you intend to keep using Explorer mode? 🤔",
+            content:
+                "The explorer mode allows you to visualize the map, find objects and areas. There are 2 systems in the explorer mode, the free exploration system or the object and area search system. The video above shows you how to use the explorer mode 💪",
+            notAskAgain: "Do not ask again",
+            close: "Close",
+            continue: "Continue",
+            // Translate previous sentence to english
+            // "The explorer mode allows you to visualize the map, find objects and areas. There are 2 systems in the explorer mode, the free exploration system or the object and area search system. The video above shows you how to use the explorer mode 💪"
+        },
+        closeSearchMode: "Close search mode",
+    },
+    listRoom: {
+        isFetching: "Room list is fetching... ⤵️",
+        noRoomFound: "No room found 🙅‍♂️",
+        items: "{countEntity} entities / {countArea} areas",
+        close: "Close",
+        movingToRoom: "Moving to the room: {roomNameSelected}... See you soon... 🫡",
+        searchLabel: "Search a room",
+        searchPlaceholder: "Write...",
     },
 };
 

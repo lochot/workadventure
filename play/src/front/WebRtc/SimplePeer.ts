@@ -11,6 +11,7 @@ import { peerStore, screenSharingPeerStore } from "../Stores/PeerStore";
 import { batchGetUserMediaStore } from "../Stores/MediaStore";
 import { analyticsClient } from "../Administration/AnalyticsClient";
 import { nbSoundPlayedInBubbleStore } from "../Stores/ApparentMediaContraintStore";
+import { askDialogStore } from "../Stores/MeetingStore";
 import { mediaManager, NotificationType } from "./MediaManager";
 import { ScreenSharingPeer } from "./ScreenSharingPeer";
 import { VideoPeer } from "./VideoPeer";
@@ -213,6 +214,21 @@ export class SimplePeer {
             stream
         );
 
+        // Create subscription to statusStore to close connection when user stop sharing screen
+        // Is automatically unsubscribed when peer is destroyed
+        this.unsubscribers.push(
+            peer.statusStore.subscribe((status) => {
+                if (status === "closed") {
+                    if (!stream) {
+                        this.closeScreenSharingConnection(user.userId);
+                    } else {
+                        this.stopLocalScreenSharingStreamToUser(user.userId, stream);
+                    }
+                }
+            })
+        );
+
+        // When a connection is established to a video stream, and if a screen sharing is taking place,
         screenSharingPeerStore.addPeer(user.userId, peer);
         return peer;
     }
@@ -237,6 +253,9 @@ export class SimplePeer {
             // I do understand the method closeConnection is called twice, but I don't understand how they manage to run in parallel.
 
             this.closeScreenSharingConnection(userId);
+
+            // Close the ask dialog by user ID
+            askDialogStore.closeDialogByUserId(peer.userUuid);
         } catch (err) {
             console.error("An error occurred in closeConnection", err);
         }
@@ -249,6 +268,11 @@ export class SimplePeer {
         }
 
         peerStore.removePeer(userId);
+
+        // Close the ask dialog if no more users are in the discussion
+        if (peerStore.getSize() === 0) {
+            askDialogStore.closeAllDialog();
+        }
     }
 
     /**
@@ -400,16 +424,22 @@ export class SimplePeer {
     private stopLocalScreenSharingStreamToUser(userId: number, stream: MediaStream): void {
         const PeerConnectionScreenSharing = screenSharingPeerStore.getPeer(userId);
         if (!PeerConnectionScreenSharing) {
-            throw new Error("Weird, screen sharing connection to user " + userId + "not found");
+            return;
         }
 
-        // Stop sending stream and close peer connection if peer is not sending stream too
+        // Send message to stop screen sharing
         PeerConnectionScreenSharing.stopPushingScreenSharingToRemoteUser(stream);
 
+        // If there are no more screen sharing streams, let's close the connection
         if (!PeerConnectionScreenSharing.isReceivingScreenSharingStream()) {
+            // Send message to close screen sharing peer connection
+            PeerConnectionScreenSharing.finishScreenSharingToRemoteUser();
+            // Close the peer connection
             PeerConnectionScreenSharing.toClose = true;
+            // Destroy the peer connection
             PeerConnectionScreenSharing.destroy();
-            screenSharingPeerStore.removePeer(PeerConnectionScreenSharing.userId);
+            // Close the screen sharing connection
+            this.closeScreenSharingConnection(PeerConnectionScreenSharing.userId);
         }
     }
 

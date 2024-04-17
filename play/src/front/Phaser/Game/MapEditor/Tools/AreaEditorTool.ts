@@ -1,21 +1,22 @@
 import type { AreaData, AtLeast } from "@workadventure/map-editor";
+import type { EditMapCommandMessage } from "@workadventure/messages";
 import type { Unsubscriber } from "svelte/store";
 import { get } from "svelte/store";
-import type { EditMapCommandMessage } from "@workadventure/messages";
+import { v4 as uuid } from "uuid";
 import {
-    MapEditorAreaToolMode,
     mapEditorAreaModeStore,
+    MapEditorAreaToolMode,
     mapEditorSelectedAreaPreviewStore,
 } from "../../../../Stores/MapEditorStore";
 import { AreaPreview, AreaPreviewEvent } from "../../../Components/MapEditor/AreaPreview";
-import type { GameMapFrontWrapper } from "../../GameMap/GameMapFrontWrapper";
-import type { GameScene } from "../../GameScene";
-import type { MapEditorModeManager } from "../MapEditorModeManager";
 import { SizeAlteringSquare } from "../../../Components/MapEditor/SizeAlteringSquare";
 import { CopyAreaEventData } from "../../GameMap/EntitiesManager";
-import { UpdateAreaFrontCommand } from "../Commands/Area/UpdateAreaFrontCommand";
-import { DeleteAreaFrontCommand } from "../Commands/Area/DeleteAreaFrontCommand";
+import type { GameMapFrontWrapper } from "../../GameMap/GameMapFrontWrapper";
+import type { GameScene } from "../../GameScene";
 import { CreateAreaFrontCommand } from "../Commands/Area/CreateAreaFrontCommand";
+import { DeleteAreaFrontCommand } from "../Commands/Area/DeleteAreaFrontCommand";
+import { UpdateAreaFrontCommand } from "../Commands/Area/UpdateAreaFrontCommand";
+import type { MapEditorModeManager } from "../MapEditorModeManager";
 import { MapEditorTool } from "./MapEditorTool";
 
 export class AreaEditorTool extends MapEditorTool {
@@ -25,7 +26,7 @@ export class AreaEditorTool extends MapEditorTool {
     /**
      * Visual representations of map Areas objects
      */
-    private areaPreviews: AreaPreview[];
+    private areaPreviews: AreaPreview[] = [];
     private currentlySelectedPreview: AreaPreview | undefined;
 
     private active: boolean;
@@ -62,7 +63,6 @@ export class AreaEditorTool extends MapEditorTool {
         this.shiftKey = this.scene.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
         this.ctrlKey = this.scene.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.CTRL);
 
-        this.areaPreviews = this.createAreaPreviews();
         this.active = false;
         this.drawingNewArea = false;
 
@@ -95,6 +95,7 @@ export class AreaEditorTool extends MapEditorTool {
     }
 
     public activate(): void {
+        this.areaPreviews = this.createAreaPreviews();
         this.active = true;
         this.scene.input.setTopOnly(false);
         this.updateAreaPreviews();
@@ -105,6 +106,7 @@ export class AreaEditorTool extends MapEditorTool {
     }
 
     public destroy(): void {
+        this.areaPreviews.forEach((preview) => preview.destroy());
         this.selectedAreaPreviewStoreSubscriber();
         this.unbindEventHandlers();
         this.scene.input.setDefaultCursor("auto");
@@ -467,8 +469,6 @@ export class AreaEditorTool extends MapEditorTool {
             return;
         }
 
-        console.log("handleAreaUpdate", oldConfig, newConfig);
-
         const area = this.areaPreviews.find((area) => area.getAreaData().id === newConfig.id);
 
         if (area) {
@@ -506,7 +506,7 @@ export class AreaEditorTool extends MapEditorTool {
     }
 
     private copyArea(data: CopyAreaEventData): void {
-        const id = crypto.randomUUID();
+        const id = uuid();
         this.mapEditorModeManager
             .executeCommand(
                 new CreateAreaFrontCommand(
@@ -530,7 +530,7 @@ export class AreaEditorTool extends MapEditorTool {
     }
 
     private createNewArea(x: number, y: number, width: number, height: number): void {
-        const id = crypto.randomUUID();
+        const id = uuid();
         this.mapEditorModeManager
             .executeCommand(
                 new CreateAreaFrontCommand(
