@@ -139,7 +139,7 @@ class CoWebsiteManager {
         };
 
         this.mainCoWebsiteUnsubscriber = mainCoWebsite.subscribe((coWebsite) => {
-            this.buttonCloseCoWebsite.hidden = !coWebsite?.isClosable() ?? false;
+            this.buttonCloseCoWebsite.hidden = false;//!coWebsite?.isClosable() ?? false;
         });
 
         this.holderListeners();

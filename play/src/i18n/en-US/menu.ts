@@ -19,7 +19,7 @@ const menu: BaseTranslation = {
     profile: {
         edit: {
             name: "Edit your name",
-            woka: "Edit your WOKA",
+            woka: "Edit your avatar",
             companion: "Edit your companion",
             camera: "Edit your camera",
         },
