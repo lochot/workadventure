@@ -55,6 +55,7 @@ export class UserInputManager {
     private keysCode!: UserInputManagerDatum[];
     private scene: Phaser.Scene;
     private isInputDisabled: boolean;
+    private isRightClickDisabled: boolean;
 
     private joystick?: MobileJoystick;
     private joystickEvents = new ActiveEventList();
@@ -70,6 +71,7 @@ export class UserInputManager {
         this.userInputHandler = userInputHandler;
 
         this.isInputDisabled = false;
+        this.isRightClickDisabled = false;
         this.initKeyBoardEvent();
         this.bindInputEventHandlers();
         if (touchScreenManager.supportTouchScreen) {
@@ -175,10 +177,6 @@ export class UserInputManager {
         ];
     }
 
-    clearAllListeners() {
-        this.scene.input.keyboard?.removeAllListeners();
-    }
-
     disableControls() {
         try {
             this.scene.input.keyboard?.disableGlobalCapture();
@@ -199,6 +197,18 @@ export class UserInputManager {
 
     get isControlsEnabled() {
         return !this.isInputDisabled;
+    }
+
+    disableRightClick() {
+        this.isRightClickDisabled = true;
+    }
+
+    restoreRightClick() {
+        this.isRightClickDisabled = false;
+    }
+
+    get isRightClickEnabled() {
+        return !this.isRightClickDisabled;
     }
 
     getEventListForGameTick(): ActiveEventList {
@@ -250,6 +260,20 @@ export class UserInputManager {
         this.joystick = undefined;
     }
 
+    private isMoveKey(keyCode: number): boolean {
+        return [
+            Phaser.Input.Keyboard.KeyCodes.Z,
+            Phaser.Input.Keyboard.KeyCodes.W,
+            Phaser.Input.Keyboard.KeyCodes.Q,
+            Phaser.Input.Keyboard.KeyCodes.A,
+            Phaser.Input.Keyboard.KeyCodes.S,
+            Phaser.Input.Keyboard.KeyCodes.D,
+            Phaser.Input.Keyboard.KeyCodes.UP,
+            Phaser.Input.Keyboard.KeyCodes.LEFT,
+            Phaser.Input.Keyboard.KeyCodes.DOWN,
+            Phaser.Input.Keyboard.KeyCodes.RIGHT,
+        ].includes(keyCode);
+    }
     private bindInputEventHandlers() {
         this.scene.input.on(
             Phaser.Input.Events.POINTER_WHEEL,
@@ -304,6 +328,9 @@ export class UserInputManager {
         this.scene.input.on(
             Phaser.Input.Events.POINTER_MOVE,
             (pointer: Phaser.Input.Pointer, gameObjects: Phaser.GameObjects.GameObject[]) => {
+                if (this.isInputDisabled) {
+                    return;
+                }
                 this.userInputHandler.handlePointerMoveEvent(pointer, gameObjects);
             }
         );

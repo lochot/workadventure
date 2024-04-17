@@ -1,4 +1,3 @@
-import { get } from "svelte/store";
 import {
     AreaData,
     AreaDataProperties,
@@ -7,32 +6,38 @@ import {
     JitsiRoomPropertyData,
     ListenerMegaphonePropertyData,
     OpenWebsitePropertyData,
+    PersonalAreaAccessClaimMode,
+    PersonalAreaPropertyData,
     PlayAudioPropertyData,
     SpeakerMegaphonePropertyData,
 } from "@workadventure/map-editor";
-import { Jitsi } from "@workadventure/shared-utils";
 import { getSpeakerMegaphoneAreaName } from "@workadventure/map-editor/src/Utils";
+import { Jitsi } from "@workadventure/shared-utils";
 import { slugify } from "@workadventure/shared-utils/src/Jitsi/slugify";
-import { OpenCoWebsite } from "../GameMapPropertiesListener";
-import type { CoWebsite } from "../../../WebRtc/CoWebsite/CoWebsite";
-import { coWebsiteManager } from "../../../WebRtc/CoWebsiteManager";
-import { layoutManagerActionStore } from "../../../Stores/LayoutManagerStore";
-import { SimpleCoWebsite } from "../../../WebRtc/CoWebsite/SimpleCoWebsite";
-import { analyticsClient } from "../../../Administration/AnalyticsClient";
-import { localUserStore } from "../../../Connection/LocalUserStore";
-import { ON_ACTION_TRIGGER_BUTTON, ON_ICON_TRIGGER_BUTTON } from "../../../WebRtc/LayoutManager";
+import { get } from "svelte/store";
 import { LL } from "../../../../i18n/i18n-svelte";
-import { GameScene } from "../GameScene";
-import { inJitsiStore, inOpenWebsite, isSpeakerStore, silentStore } from "../../../Stores/MediaStore";
-import { JitsiCoWebsite } from "../../../WebRtc/CoWebsite/JitsiCoWebsite";
-import { JITSI_PRIVATE_MODE, JITSI_URL } from "../../../Enum/EnvironmentVariable";
-import { scriptUtils } from "../../../Api/ScriptUtils";
-import { audioManagerFileStore, audioManagerVisibilityStore } from "../../../Stores/AudioManagerStore";
-import { currentLiveStreamingNameStore } from "../../../Stores/MegaphoneStore";
-import { gameManager } from "../GameManager";
+import { analyticsClient } from "../../../Administration/AnalyticsClient";
 import { iframeListener } from "../../../Api/IframeListener";
-import { chatZoneLiveStore } from "../../../Stores/ChatStore";
+import { scriptUtils } from "../../../Api/ScriptUtils";
+import { localUserStore } from "../../../Connection/LocalUserStore";
 import { Room } from "../../../Connection/Room";
+import { JITSI_PRIVATE_MODE, JITSI_URL } from "../../../Enum/EnvironmentVariable";
+import { audioManagerFileStore, audioManagerVisibilityStore } from "../../../Stores/AudioManagerStore";
+import { chatZoneLiveStore } from "../../../Stores/ChatStore";
+import { layoutManagerActionStore } from "../../../Stores/LayoutManagerStore";
+import { inJitsiStore, inOpenWebsite, isSpeakerStore, silentStore } from "../../../Stores/MediaStore";
+import { currentLiveStreamingNameStore } from "../../../Stores/MegaphoneStore";
+import { notificationPlayingStore } from "../../../Stores/NotificationStore";
+import type { CoWebsite } from "../../../WebRtc/CoWebsite/CoWebsite";
+import { JitsiCoWebsite } from "../../../WebRtc/CoWebsite/JitsiCoWebsite";
+import { SimpleCoWebsite } from "../../../WebRtc/CoWebsite/SimpleCoWebsite";
+import { coWebsiteManager } from "../../../WebRtc/CoWebsiteManager";
+import { ON_ACTION_TRIGGER_BUTTON, ON_ICON_TRIGGER_BUTTON } from "../../../WebRtc/LayoutManager";
+import { gameManager } from "../GameManager";
+import { OpenCoWebsite } from "../GameMapPropertiesListener";
+import { GameScene } from "../GameScene";
+import { mapEditorAskToClaimPersonalAreaStore } from "../../../Stores/MapEditorStore";
+import { requestVisitCardsStore } from "../../../Stores/GameStore";
 
 export class AreasPropertiesListener {
     private scene: GameScene;
@@ -52,8 +57,16 @@ export class AreasPropertiesListener {
             // analytics event for area
             analyticsClient.enterAreaMapEditor(area.id, area.name);
 
+            // Send event to enter in the area
+            iframeListener.sendEnterAreaEvent(area.name);
+
             if (!area.properties) {
                 continue;
+            }
+
+            // Add new notification to show at the user that he entered a new area
+            if (area.name && area.name !== "") {
+                notificationPlayingStore.playNotification(area.name);
             }
             for (const property of area.properties) {
                 this.addPropertyFilter(property, area);
@@ -104,6 +117,9 @@ export class AreasPropertiesListener {
             // analytics event for area
             analyticsClient.leaveAreaMapEditor(area.id, area.name);
 
+            // Send event to leave the area
+            iframeListener.sendLeaveAreaEvent(area.name);
+
             if (!area.properties) {
                 continue;
             }
@@ -149,6 +165,11 @@ export class AreasPropertiesListener {
                     url = `${property.url}#${property.areaName}`;
                 }
                 this.handleExitPropertyOnEnter(url);
+                break;
+            }
+            case "personalAreaPropertyData": {
+                this.handlePersonalAreaPropertyOnEnter(property, area);
+
                 break;
             }
             default: {
@@ -206,6 +227,12 @@ export class AreasPropertiesListener {
                 this.handleExitPropertyOnEnter(url);
                 break;
             }
+            case "personalAreaPropertyData": {
+                newProperty = newProperty as typeof oldProperty;
+                this.handlePersonalAreaPropertyOnLeave();
+                this.handlePersonalAreaPropertyOnEnter(newProperty, area);
+                break;
+            }
             case "silent":
             default: {
                 break;
@@ -243,6 +270,10 @@ export class AreasPropertiesListener {
                 this.handleListenerMegaphonePropertyOnLeave(property);
                 break;
             }
+            case "personalAreaPropertyData": {
+                this.handlePersonalAreaPropertyOnLeave();
+                break;
+            }
             default: {
                 break;
             }
@@ -256,9 +287,13 @@ export class AreasPropertiesListener {
     }
 
     private handleOpenWebsitePropertyOnEnter(property: OpenWebsitePropertyData): void {
+        if (!property.link) {
+            return;
+        }
+
         const actionId = "openWebsite-" + (Math.random() + 1).toString(36).substring(7);
 
-        if (property.newTab && property.link != undefined) {
+        if (property.newTab) {
             const forceTrigger = localUserStore.getForceCowebsiteTrigger();
             if (forceTrigger || property.trigger === ON_ACTION_TRIGGER_BUTTON) {
                 this.coWebsitesActionTriggers.set(property.id, actionId);
@@ -424,6 +459,41 @@ export class AreasPropertiesListener {
         }
     }
 
+    private handlePersonalAreaPropertyOnEnter(property: PersonalAreaPropertyData, areaData: AreaData): void {
+        if (property.ownerId !== null) {
+            this.displayPersonalAreaOwnerVisitCard(property.ownerId);
+        } else if (property.accessClaimMode === PersonalAreaAccessClaimMode.enum.dynamic) {
+            this.displayPersonalAreaClaimDialogBox(property, areaData);
+        }
+    }
+
+    private displayPersonalAreaOwnerVisitCard(ownerId: string) {
+        const connectedUserUUID = localUserStore.getLocalUser()?.uuid;
+        if (connectedUserUUID != ownerId) {
+            const connection = this.scene.connection;
+            if (connection) {
+                connection
+                    .queryMember(ownerId)
+                    .then((member) => {
+                        if (member?.visitCardUrl) {
+                            requestVisitCardsStore.set(member.visitCardUrl);
+                        }
+                    })
+                    .catch((error) => console.error(error));
+            }
+        }
+    }
+
+    private displayPersonalAreaClaimDialogBox(property: PersonalAreaPropertyData, areaData: AreaData) {
+        const userHasAllowedTagToClaimTheArea =
+            localUserStore.isLogged() &&
+            (property.allowedTags.length === 0 ||
+                property.allowedTags.some((tag) => this.scene.connection?.hasTag(tag)));
+        if (userHasAllowedTagToClaimTheArea) {
+            mapEditorAskToClaimPersonalAreaStore.set(areaData);
+        }
+    }
+
     private handleSilentPropertyOnEnter(): void {
         silentStore.setAreaSilent(true);
     }
@@ -504,13 +574,21 @@ export class AreasPropertiesListener {
         inJitsiStore.set(false);
     }
 
+    private handlePersonalAreaPropertyOnLeave(): void {
+        mapEditorAskToClaimPersonalAreaStore.set(undefined);
+        if (get(requestVisitCardsStore)) {
+            requestVisitCardsStore.set(null);
+        }
+    }
+
     private openCoWebsiteFunction(
         property: OpenWebsitePropertyData,
         coWebsiteOpen: OpenCoWebsite,
         actionId: string
     ): void {
+        const url = new URL(property.link ?? "", this.scene.mapUrlFile);
         const coWebsite = new SimpleCoWebsite(
-            new URL(property.link ?? "", this.scene.mapUrlFile),
+            url,
             property.allowAPI,
             property.policy,
             property.width,
@@ -527,7 +605,7 @@ export class AreasPropertiesListener {
         inOpenWebsite.set(true);
 
         // analytics event for open website
-        analyticsClient.openedWebsite(coWebsite.getUrl());
+        analyticsClient.openedWebsite(url);
     }
 
     private loadCoWebsiteFunction(coWebsite: CoWebsite, actionId: string): void {
@@ -542,7 +620,7 @@ export class AreasPropertiesListener {
         if (property.name !== undefined && property.id !== undefined) {
             const uniqRoomName = Jitsi.slugifyJitsiRoomName(property.name, this.scene.roomUrl);
             // TODO remove this console.log after testing
-            console.info("handleSpeakerMegaphonePropertyOnEnter => uniqRoomName : ", uniqRoomName);
+            console.info("handleSpeakerMegaphonePropertyOnEnter => joinSpace => uniqRoomName : ", uniqRoomName);
             currentLiveStreamingNameStore.set(uniqRoomName);
             this.scene.broadcastService.joinSpace(uniqRoomName, false);
             isSpeakerStore.set(true);
@@ -557,8 +635,6 @@ export class AreasPropertiesListener {
         if (property.name !== undefined && property.id !== undefined) {
             isSpeakerStore.set(false);
             const uniqRoomName = Jitsi.slugifyJitsiRoomName(property.name, this.scene.roomUrl);
-            // TODO remove this console.log after testing
-            console.info("handleSpeakerMegaphonePropertyOnEnter => uniqRoomName : ", uniqRoomName);
             currentLiveStreamingNameStore.set(undefined);
             this.scene.broadcastService.leaveSpace(uniqRoomName);
             if (property.chatEnabled) {
@@ -575,8 +651,8 @@ export class AreasPropertiesListener {
             );
             if (speakerZoneName) {
                 const uniqRoomName = Jitsi.slugifyJitsiRoomName(speakerZoneName, this.scene.roomUrl);
-                // TODO remove this console.log after testing
-                console.info("handleListenerMegaphonePropertyOnEnter => uniqRoomName", uniqRoomName);
+                // TODO remove this log after testing
+                console.info("handleListenerMegaphonePropertyOnEnter => joinSpace => uniqRoomName", uniqRoomName);
                 currentLiveStreamingNameStore.set(uniqRoomName);
                 this.scene.broadcastService.joinSpace(uniqRoomName, false);
                 if (property.chatEnabled) {
@@ -594,7 +670,7 @@ export class AreasPropertiesListener {
             );
             if (speakerZoneName) {
                 const uniqRoomName = Jitsi.slugifyJitsiRoomName(speakerZoneName, this.scene.roomUrl);
-                // TODO remove this console.log after testing
+                // TODO remove this log after testing
                 console.info("handleListenerMegaphonePropertyOnLeave => uniqRoomName", uniqRoomName);
                 currentLiveStreamingNameStore.set(undefined);
                 this.scene.broadcastService.leaveSpace(uniqRoomName);

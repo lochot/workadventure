@@ -7,6 +7,8 @@ const mapEditor: DeepPartial<Translation["mapEditor"]> = {
         entityEditor: "Entita wobdźěłać",
         tileEditor: "Kachlu wobdźěłać",
         trashEditor: "papjernik",
+        closeMapEditor: "Mapu zacyniś",
+        mapManagerActivated: "Mapowy manager je aktiwny",
     },
     properties: {
         silentProperty: {
@@ -79,6 +81,7 @@ const mapEditor: DeepPartial<Translation["mapEditor"]> = {
             errorInvalidUrl: 'Njepłaćiwa URL. Dyrbi so z "http: /" abo "https: / /" započeć.',
             findOutMoreHere: "Tu zhoniće wjace",
             openPickerSelector: "Wubrać",
+            forcedInNewTab: "W nowem tabje wočinić",
         },
         advancedOptions: "Rozšěrjene opcije",
         speakerMegaphoneProperties: {
@@ -152,6 +155,10 @@ const mapEditor: DeepPartial<Translation["mapEditor"]> = {
     areaEditor: {
         editInstructions: "Klikńće na płoninu, zo byšće jeje kajkosće změnili.",
         nameLabel: "mjeno",
+        nameLabelPlaceholder: "mjeno",
+        areaDescription: "pśedstajenje",
+        areaDescriptionPlaceholder: "pśedstajenje",
+        addDescriptionField: "Pśedstajenje přidać",
     },
     areaEditorInstructions: {
         title: "Kako deluje?",
@@ -170,6 +177,11 @@ const mapEditor: DeepPartial<Translation["mapEditor"]> = {
         buttonLabel: "kneflowe popisanje",
         editInstructions: "Klikńće na objekt, zo byšće jeho kajkosće změnili.",
         selectObject: "Klikńće na objekt, zo byšće jón wuzwolił.",
+        objectName: "mjeno",
+        objectNamePlaceholder: "mjeno",
+        objectDescription: "pśedstajenje",
+        objectDescriptionPlaceholder: "pśedstajenje",
+        addDescriptionField: "Pśedstajenje přidać",
     },
     settings: {
         loading: "Laden...",

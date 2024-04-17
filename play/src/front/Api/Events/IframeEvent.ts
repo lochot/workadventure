@@ -321,6 +321,46 @@ export const isIframeEventWrapper = z.union([
         type: z.literal("banUser"),
         data: isBanEvent,
     }),
+    z.object({
+        type: z.literal("disableMapEditor"),
+        data: z.undefined(),
+    }),
+    z.object({
+        type: z.literal("restoreMapEditor"),
+        data: z.undefined(),
+    }),
+    z.object({
+        type: z.literal("disableScreenSharing"),
+        data: z.undefined(),
+    }),
+    z.object({
+        type: z.literal("restoreScreenSharing"),
+        data: z.undefined(),
+    }),
+    z.object({
+        type: z.literal("disableRightClick"),
+        data: z.undefined(),
+    }),
+    z.object({
+        type: z.literal("restoreRightClick"),
+        data: z.undefined(),
+    }),
+    z.object({
+        type: z.literal("disableWheelZoom"),
+        data: z.undefined(),
+    }),
+    z.object({
+        type: z.literal("restoreWheelZoom"),
+        data: z.undefined(),
+    }),
+    z.object({
+        type: z.literal("disableInviteUserButton"),
+        data: z.undefined(),
+    }),
+    z.object({
+        type: z.literal("restoreInviteUserButton"),
+        data: z.undefined(),
+    }),
 ]);
 
 export type IframeEvent = z.infer<typeof isIframeEventWrapper>;
@@ -345,6 +385,14 @@ export const isIframeResponseEvent = z.union([
     z.object({
         type: z.literal("leaveProximityMeetingEvent"),
         data: z.undefined(),
+    }),
+    z.object({
+        type: z.literal("onFollowed"),
+        data: isParticipantProximityMeetingEvent,
+    }),
+    z.object({
+        type: z.literal("onUnfollowed"),
+        data: isParticipantProximityMeetingEvent,
     }),
     z.object({
         type: z.literal("enterEvent"),
@@ -620,6 +668,14 @@ export const iframeQueryMapTypeGuards = {
     },
     playSoundInBubble: {
         query: isPlaySoundInBubbleEvent,
+        answer: z.undefined(),
+    },
+    followMe: {
+        query: z.undefined(),
+        answer: z.undefined(),
+    },
+    stopLeading: {
+        query: z.undefined(),
         answer: z.undefined(),
     },
 };

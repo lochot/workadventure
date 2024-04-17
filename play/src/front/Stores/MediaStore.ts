@@ -8,6 +8,7 @@ import { isIOS } from "../WebRtc/DeviceUtils";
 import { ObtainedMediaStreamConstraints } from "../WebRtc/P2PMessages/ConstraintMessage";
 import { isMediaBreakpointUp } from "../Utils/BreakpointsUtils";
 import { SoundMeter } from "../Phaser/Components/SoundMeter";
+import { RequestedStatus } from "../Rules/StatusRules/statusRules";
 import { userMovingStore } from "./GameStore";
 import { BrowserTooOldError } from "./Errors/BrowserTooOldError";
 import { errorStore } from "./ErrorStore";
@@ -247,7 +248,6 @@ export const videoConstraintStore = derived(
         } as MediaTrackConstraints;
 
         if ($cameraDeviceIdStore !== undefined) {
-            console.log("Using camera device ID", $cameraDeviceIdStore);
             constraints.deviceId = {
                 exact: $cameraDeviceIdStore,
             };
@@ -325,6 +325,8 @@ export const inJitsiStore = writable(false);
 export const inBbbStore = writable(false);
 export const isSpeakerStore = writable(false);
 
+export const requestedStatusStore: Writable<RequestedStatus | null> = writable(localUserStore.getRequestedStatus());
+
 export const inCowebsiteZone = derived(
     [inJitsiStore, inBbbStore, inOpenWebsite],
     ([$inJitsiStore, $inBbbStore, $inOpenWebsite]) => {
@@ -336,13 +338,30 @@ export const inCowebsiteZone = derived(
 export const silentStore = createSilentStore();
 
 export const availabilityStatusStore = derived(
-    [inJitsiStore, inBbbStore, silentStore, privacyShutdownStore, proximityMeetingStore, isSpeakerStore],
-    ([$inJitsiStore, $inBbbStore, $silentStore, $privacyShutdownStore, $proximityMeetingStore, $isSpeakerStore]) => {
+    [
+        inJitsiStore,
+        inBbbStore,
+        silentStore,
+        privacyShutdownStore,
+        proximityMeetingStore,
+        isSpeakerStore,
+        requestedStatusStore,
+    ],
+    ([
+        $inJitsiStore,
+        $inBbbStore,
+        $silentStore,
+        $privacyShutdownStore,
+        $proximityMeetingStore,
+        $isSpeakerStore,
+        $requestedStatusStore,
+    ]) => {
         if ($inJitsiStore) return AvailabilityStatus.JITSI;
         if ($inBbbStore) return AvailabilityStatus.BBB;
         if (!$proximityMeetingStore) return AvailabilityStatus.DENY_PROXIMITY_MEETING;
         if ($isSpeakerStore) return AvailabilityStatus.SPEAKER;
         if ($silentStore) return AvailabilityStatus.SILENT;
+        if ($requestedStatusStore) return $requestedStatusStore;
         if ($privacyShutdownStore) return AvailabilityStatus.AWAY;
         return AvailabilityStatus.ONLINE;
     },
@@ -441,7 +460,10 @@ export const mediaStreamConstraintsStore = derived(
         if (
             $availabilityStatusStore === AvailabilityStatus.DENY_PROXIMITY_MEETING ||
             $availabilityStatusStore === AvailabilityStatus.SILENT ||
-            $availabilityStatusStore === AvailabilityStatus.SPEAKER
+            $availabilityStatusStore === AvailabilityStatus.SPEAKER ||
+            $availabilityStatusStore === AvailabilityStatus.DO_NOT_DISTURB ||
+            $availabilityStatusStore === AvailabilityStatus.BACK_IN_A_MOMENT ||
+            $availabilityStatusStore === AvailabilityStatus.BUSY
         ) {
             currentVideoConstraint = false;
             currentAudioConstraint = false;
@@ -782,10 +804,8 @@ export const speakerListStore = derived(deviceListStore, ($deviceListStore) => {
 export const selectDefaultSpeaker = () => {
     const devices = get(speakerListStore);
     if (devices !== undefined && devices.length > 0) {
-        console.log("Selecting default speaker");
         speakerSelectedStore.set(devices[0].deviceId);
     } else {
-        console.log("No output device found");
         speakerSelectedStore.set(undefined);
     }
 };
@@ -840,7 +860,6 @@ cameraListStore.subscribe((devices) => {
     // If we cannot find the device ID, let's remove it.
     if (isConstrainDOMStringParameters(deviceId)) {
         if (!devices.find((device) => device.deviceId === deviceId.exact)) {
-            console.log("Camera unplugged, removing constraint on deviceId");
             requestedCameraDeviceIdStore.set(undefined);
         }
     }
@@ -867,7 +886,6 @@ microphoneListStore.subscribe((devices) => {
     // If we cannot find the device ID, let's remove it.
     if (isConstrainDOMStringParameters(deviceId)) {
         if (!devices.find((device) => device.deviceId === deviceId.exact)) {
-            console.log("Microphone unplugged, removing constraint on deviceId");
             requestedMicrophoneDeviceIdStore.set(undefined);
         }
     }

@@ -1,4 +1,4 @@
-import { GameMap, UpdateEntityCommand, WAMEntityData } from "@workadventure/map-editor";
+import { GameMap, UpdateEntityCommand, WAMEntityData, WAMFileFormat } from "@workadventure/map-editor";
 import { EntitiesManager } from "../../../GameMap/EntitiesManager";
 import { Entity } from "../../../../ECS/Entity";
 import { GameScene } from "../../../GameScene";
@@ -18,11 +18,44 @@ export class UpdateEntityFrontCommand extends UpdateEntityCommand implements Fro
         super(gameMap, entityId, dataToModify, commandId, oldConfig);
     }
 
-    public execute(): Promise<void> {
+    public execute(): Promise<WAMFileFormat | undefined> {
         const returnVal = super.execute();
         this.handleEntityUpdate(this.newConfig);
 
         return returnVal;
+    }
+
+    public getUndoCommand(): UpdateEntityFrontCommand {
+        return new UpdateEntityFrontCommand(
+            this.gameMap,
+            this.entityId,
+            this.oldConfig,
+            undefined,
+            this.newConfig,
+            this.entitiesManager,
+            this.scene
+        );
+    }
+
+    public emitEvent(roomConnection: RoomConnection): void {
+        const entity = this.entitiesManager.getEntities().get(this.entityId);
+        if (!entity) {
+            console.error("Entity not found");
+            return;
+        }
+        roomConnection.emitMapEditorModifyEntity(
+            this.commandId,
+            this.entityId,
+            {
+                x: entity.x,
+                y: entity.y,
+                ...this.newConfig,
+            },
+            {
+                width: entity.width,
+                height: entity.height,
+            }
+        );
     }
 
     private handleEntityUpdate(config: Partial<WAMEntityData>): void {
@@ -43,20 +76,5 @@ export class UpdateEntityFrontCommand extends UpdateEntityCommand implements Fro
             this.scene.getGameMapFrontWrapper().modifyToCollisionsLayer(oldX, oldY, "0", reversedGrid);
             this.scene.getGameMapFrontWrapper().modifyToCollisionsLayer(entity.x, entity.y, "0", grid);
         }
-    }
-
-    public getUndoCommand(): UpdateEntityFrontCommand {
-        return new UpdateEntityFrontCommand(
-            this.gameMap,
-            this.entityId,
-            this.oldConfig,
-            undefined,
-            this.newConfig,
-            this.entitiesManager,
-            this.scene
-        );
-    }
-    public emitEvent(roomConnection: RoomConnection): void {
-        roomConnection.emitMapEditorModifyEntity(this.commandId, this.entityId, this.newConfig);
     }
 }

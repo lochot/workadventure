@@ -1,11 +1,11 @@
 import path from "path";
-import * as fs from "fs-extra";
-import { NextFunction, Response } from "express";
 import { Archiver } from "archiver";
+import { NextFunction, Response } from "express";
+import * as fs from "fs-extra";
 import { StreamZipAsync, ZipEntry } from "node-stream-zip";
 import { MapListService } from "../Services/MapListService";
-import { FileSystemInterface } from "./FileSystemInterface";
 import { FileNotFoundError } from "./FileNotFoundError";
+import { FileSystemInterface } from "./FileSystemInterface";
 import { NodeError } from "./NodeError";
 
 export class DiskFileSystem implements FileSystemInterface {
@@ -131,6 +131,13 @@ export class DiskFileSystem implements FileSystemInterface {
         });
     }
 
+    async writeByteArrayAsFile(virtualPath: string, content: Uint8Array): Promise<void> {
+        const fullPath = this.getFullPath(virtualPath);
+        const dir = path.dirname(fullPath);
+        await fs.mkdirp(dir);
+        return fs.writeFile(fullPath, Buffer.from(content), { encoding: "utf-8" });
+    }
+
     archiveDirectory(archiver: Archiver, virtualPath: string): Promise<void> {
         const fullPath = this.getFullPath(virtualPath);
         archiver.glob("**/*", { cwd: fullPath, ignore: MapListService.CACHE_NAME });
@@ -156,7 +163,7 @@ export class DiskFileSystem implements FileSystemInterface {
                     results.push(path.relative(startingDir, file));
                 }
             }
-            return results;
+            return results.map((path) => (path.indexOf("/") === 0 ? path.substring(1) : path));
         } catch (e) {
             const nodeError = NodeError.safeParse(e);
             if (e instanceof Error && nodeError.success && nodeError.data.code === "ENOENT") {
