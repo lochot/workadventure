@@ -879,7 +879,7 @@
                     </button>
                 </div>
 
-                {#if $userHasAccessToBackOfficeStore}
+                {#if $userHasAccessToBackOfficeStore && 1 === 0}
                    
                     <div
                         on:dragstart|preventDefault={noDrag}
@@ -894,14 +894,14 @@
                         </button>
                     </div>
                 {/if}
-            -->
+            
             </div>
 
-            <div class="bottom-action-section tw-flex tw-flex-initial">
+            <!--<div class="bottom-action-section tw-flex tw-flex-initial"> -->
                 <!-- TODO button hep -->
                 <!-- Room list button -->
                 <!-- svelte-ignore a11y-click-events-have-key-events -->
-                <div
+            <!--    <div
                     on:dragstart|preventDefault={noDrag}
                     on:click={() => analyticsClient.openedRoomList()}
                     on:click={showRoomList}
@@ -911,10 +911,10 @@
 
                     <button id="roomListIcon" class:border-top-light={$roomListVisibilityStore}>
                         <!-- svelte-ignore a11y-img-redundant-alt -->
-                        <img draggable="false" src={worldImg} style="padding: 2px" alt="Image for room list modal" />
+                    <!--     <img draggable="false" src={worldImg} style="padding: 2px" alt="Image for room list modal" />
                     </button>
                 </div>
-            </div>
+            </div> -->
 
             {#if $addActionButtonActionBarEvent.length > 0}
                 <div class="bottom-action-section tw-flex tw-flex-initial">
