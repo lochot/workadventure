@@ -909,7 +909,7 @@
                 >
                     <Tooltip text={$LL.actionbar.roomList()} />
 
-                    <button id="roomListIcon" class:border-top-light={$roomListVisibilityStore}>
+                    <button id="roomListIcon" class:border-top-light={$roomListVisibilityStore}> -->
                         <!-- svelte-ignore a11y-img-redundant-alt -->
                     <!--     <img draggable="false" src={worldImg} style="padding: 2px" alt="Image for room list modal" />
                     </button>
