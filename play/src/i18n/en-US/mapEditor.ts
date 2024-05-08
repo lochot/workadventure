@@ -13,6 +13,12 @@ const mapEditor: BaseTranslation = {
         exploreTheRoom: "Explore the room",
         closeMapEditor: "Close map editor",
         mapManagerActivated: "Map manager activated",
+        mapExplorerActivated: "Map overview",
+        exploreTheRoomActivated: "Explore the room activated",
+        areaEditorActivated: "Area editor activated",
+        entityEditorActivated: "Entity editor activated",
+        trashEditorActivated: "Trash editor activated",
+        configureMyRoomActivated: "Configure my room activated",
     },
     properties: {
         silentProperty: {
@@ -204,6 +210,15 @@ const mapEditor: BaseTranslation = {
         areaDescriptionPlaceholder: "My area is a...",
         areaSerchable: "Searchable in the exploration mode",
         addDescriptionField: "Add description field",
+        actionPopupOnPersonalAreaWithEntities: {
+            title: "Action required",
+            description: "This personal area contains one or more objects. What would you like to do with it/them ?",
+            buttons: {
+                keep: "Keep",
+                remove: "Remove",
+                cancel: "Cancel",
+            },
+        },
     },
     areaEditorInstructions: {
         title: "How it works ?",
@@ -322,10 +337,6 @@ const mapEditor: BaseTranslation = {
         title: "Explore the room",
         description:
             "Allow to explore the room. You be able to move around the room and interact with objects. 2 mode are available: 'Exploration' and 'Search'. The 'Search mode' mode will propose you to search or filter entities and areas in the room. The 'Exploration mode' mode will let you move freely in the room.",
-        explorationModeTitle: "Exploration mode",
-        explorationModeDescription: "Move freely in the room and explore the different areas and entities 🗺️",
-        searchModeTitle: "Search mode",
-        searchModeDescription: "Search or filter entities and areas in the room 🧐",
         noEntitiesFound: "No entity found in the room 🙅‍♂️",
         entitiesFound: "object{{s}} found",
         noAreasFound: "No area found in the room 🙅‍♀️",
@@ -335,18 +346,8 @@ const mapEditor: BaseTranslation = {
             close: "Close",
             moveToEntity: "Move to entity {name}",
             moveToArea: "Move to area {name}",
+            errorMovingToObject: "The object is not accessible yet 🚫",
         },
-        popup: {
-            title: "Do you intend to keep using Explorer mode? 🤔",
-            content:
-                "The explorer mode allows you to visualize the map, find objects and areas. There are 2 systems in the explorer mode, the free exploration system or the object and area search system. The video above shows you how to use the explorer mode 💪",
-            notAskAgain: "Do not ask again",
-            close: "Close",
-            continue: "Continue",
-            // Translate previous sentence to english
-            // "The explorer mode allows you to visualize the map, find objects and areas. There are 2 systems in the explorer mode, the free exploration system or the object and area search system. The video above shows you how to use the explorer mode 💪"
-        },
-        closeSearchMode: "Close search mode",
     },
     listRoom: {
         isFetching: "Room list is fetching... ⤵️",

@@ -16,6 +16,7 @@
     import AddPropertyButtonWrapper from "../MapEditor/PropertyEditor/AddPropertyButtonWrapper.svelte";
     import LL from "../../../i18n/i18n-svelte";
     import { analyticsClient } from "../../Administration/AnalyticsClient";
+    import { warningMessageStore } from "../../Stores/ErrorStore";
 
     // Create type for component AddPropertyButton
     type AddPropertyButtonType = {
@@ -24,7 +25,7 @@
     };
 
     let iconProperties = writable<Map<string, AddPropertyButtonType>>(new Map());
-    let holdEntity: Entity | AreaPreview | undefined;
+    let oldEntity: Entity | AreaPreview | undefined;
     let mapExplorationObjectSelectedStoreSubscription: Unsubscriber;
     let description: string | undefined;
 
@@ -41,11 +42,11 @@
         initPropertyComponents();
 
         // Make sure that if the user click on another object, the previous one is not selected anymore
-        holdEntity = $mapExplorationObjectSelectedStore;
+        oldEntity = $mapExplorationObjectSelectedStore;
         mapExplorationObjectSelectedStoreSubscription = mapExplorationObjectSelectedStore.subscribe((value) => {
-            if (holdEntity instanceof Entity) holdEntity.setPointedToEditColor(0x000000);
-            if (holdEntity instanceof AreaPreview) holdEntity.setStrokeStyle(2, 0x000000);
-            holdEntity = value;
+            if (oldEntity instanceof Entity) oldEntity.removePointedToEditColor();
+            if (oldEntity instanceof AreaPreview) oldEntity.setStrokeStyle(2, 0x000000);
+            oldEntity = value;
             if (value instanceof Entity) value.setPointedToEditColor(0xf9e82d);
             if (value instanceof AreaPreview) value.setStrokeStyle(2, 0xf9e82d);
 
@@ -55,11 +56,11 @@
     onDestroy(() => {
         if (mapExplorationObjectSelectedStoreSubscription) mapExplorationObjectSelectedStoreSubscription();
         if ($mapExplorationObjectSelectedStore instanceof Entity)
-            $mapExplorationObjectSelectedStore.setPointedToEditColor(0x000000);
+            $mapExplorationObjectSelectedStore.removePointedToEditColor();
         if ($mapExplorationObjectSelectedStore instanceof AreaPreview)
             $mapExplorationObjectSelectedStore.setStrokeStyle(2, 0x000000);
-        if (holdEntity instanceof Entity) holdEntity.setPointedToEditColor(0x000000);
-        if (holdEntity instanceof AreaPreview) holdEntity.setStrokeStyle(2, 0x000000);
+        if (oldEntity instanceof Entity) oldEntity.removePointedToEditColor();
+        if (oldEntity instanceof AreaPreview) oldEntity.setStrokeStyle(2, 0x000000);
 
         cleanPropertyComponents();
     });
@@ -80,16 +81,13 @@
 
         if ($mapExplorationObjectSelectedStore instanceof AreaPreview) {
             for (const value of $mapExplorationObjectSelectedStore.getAreaData().properties.values()) {
-                console.log(value);
                 newIconProperties.set(value.id, createPropertyData(value));
             }
         }
         iconProperties.set(newIconProperties);
-        console.log($iconProperties);
     }
 
     function createPropertyData(value: EntityDataProperty | AreaDataProperty): AddPropertyButtonType {
-        console.log("createPropertyData", value);
         const property: AddPropertyButtonType = {
             property: value.type as EntityDataPropertiesKeys,
             subProperty: undefined,
@@ -102,11 +100,11 @@
 
     function close() {
         if ($mapExplorationObjectSelectedStore instanceof Entity)
-            $mapExplorationObjectSelectedStore.setPointedToEditColor(0x000000);
+            $mapExplorationObjectSelectedStore.removePointedToEditColor();
         if ($mapExplorationObjectSelectedStore instanceof AreaPreview)
             $mapExplorationObjectSelectedStore.setStrokeStyle(2, 0x000000);
-        if (holdEntity instanceof Entity) holdEntity.setPointedToEditColor(0x000000);
-        if (holdEntity instanceof AreaPreview) holdEntity.setStrokeStyle(2, 0x000000);
+        if (oldEntity instanceof Entity) oldEntity.removePointedToEditColor();
+        if (oldEntity instanceof AreaPreview) oldEntity.setStrokeStyle(2, 0x000000);
         mapExplorationObjectSelectedStore.set(undefined);
     }
     function goTo() {
@@ -121,7 +119,12 @@
                     },
                     true
                 )
-                .catch((error) => console.warn(error));
+                .catch((error) => {
+                    console.warn("Error while moving to the entity or area", error);
+                    warningMessageStore.addWarningMessage($LL.mapEditor.explorer.details.errorMovingToObject(), {
+                        closable: true,
+                    });
+                });
             gameManager.getCurrentGameScene().getMapEditorModeManager().equipTool(undefined);
 
             // Close map editor to walk on the entity or zone

@@ -1,6 +1,7 @@
 <script lang="ts">
     import { createEventDispatcher } from "svelte";
     import Select from "svelte-select";
+    import LL from "../../../i18n/i18n-svelte";
     import { InputTagOption } from "./InputTagOption";
 
     const dispatch = createEventDispatcher();
@@ -15,11 +16,12 @@
 
     let filterText = "";
 
-    function handleFilter(e: { detail: [] }) {
+    function handleFilter() {
         if (value?.find((i) => i.label === filterText)) return;
-        if (e.detail.length === 0 && filterText.length > 0) {
+        if (options?.find((i) => i.label === filterText)) return;
+        if (filterText.length > 0) {
             const prev = options.filter((i) => !i.created);
-            options = [...prev, { value: filterText, label: filterText.toLocaleUpperCase(), created: true }];
+            options = [...prev, { value: filterText, label: filterText.toLowerCase(), created: true }];
         }
     }
 
@@ -56,8 +58,7 @@
         inputAttributes={{ "data-testid": testId }}
     >
         <div slot="item" let:item>
-            {item.created ? "Add new : " : ""}
-            {item.label}
+            {item.created ? $LL.notification.addNewTag({ tag: filterText }) : item.label}
         </div>
     </Select>
 </div>

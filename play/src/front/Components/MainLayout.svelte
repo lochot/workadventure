@@ -6,8 +6,8 @@
     import { requestVisitCardsStore } from "../Stores/GameStore";
     import {
         helpCameraSettingsVisibleStore,
-        helpWebRtcSettingsVisibleStore,
         helpNotificationSettingsVisibleStore,
+        helpWebRtcSettingsVisibleStore,
     } from "../Stores/HelpSettingsStore";
     import { helpSettingsPopupBlockedStore } from "../Stores/HelpSettingsPopupBlockedStore";
     import { layoutManagerActionVisibilityStore } from "../Stores/LayoutManagerStore";
@@ -19,11 +19,10 @@
     import { textMessageStore } from "../Stores/TypeMessageStore/TextMessageStore";
     import { soundPlayingStore } from "../Stores/SoundPlayingStore";
     import {
-        showLimitRoomModalStore,
         modalVisibilityStore,
-        showModalGlobalComminucationVisibilityStore,
-        modalPopupVisibilityStore,
         roomListVisibilityStore,
+        showLimitRoomModalStore,
+        showModalGlobalComminucationVisibilityStore,
     } from "../Stores/ModalStore";
     import { actionsMenuStore } from "../Stores/ActionsMenuStore";
     import { showDesktopCapturerSourcePicker } from "../Stores/ScreenSharingStore";
@@ -69,10 +68,10 @@
     import NotificationPermissionModal from "./ActionBar/AvailabilityStatus/Modals/NotificationPermissionModal.svelte";
     import GlobalCommunicationModal from "./Modal/GlobalCommunicationModal.svelte";
     import ObjectDetails from "./Modal/ObjectDetails.svelte";
-    import Popup from "./Modal/Popup.svelte";
     import MapList from "./Exploration/MapList.svelte";
     import WarningToast from "./WarningContainer/WarningToast.svelte";
     import ClaimPersonalAreaDialogBox from "./MapEditor/ClaimPersonalAreaDialogBox.svelte";
+    import MainModal from "./Modal/MainModal.svelte";
 
     let mainLayout: HTMLDivElement;
 
@@ -88,7 +87,7 @@
 
 <!-- Components ordered by z-index -->
 <div id="main-layout" class={[...$coWebsites.values()].length === 0 ? "not-cowebsite" : ""} bind:this={mainLayout}>
-    {#if $modalVisibilityStore || $modalPopupVisibilityStore}
+    {#if $modalVisibilityStore}
         <div class="tw-bg-black/60 tw-w-full tw-h-full tw-fixed tw-left-0 tw-right-0" />
     {/if}
 
@@ -192,15 +191,14 @@
             <ObjectDetails />
         {/if}
 
-        {#if $modalPopupVisibilityStore}
-            <Popup />
-        {/if}
         {#if $roomListVisibilityStore}
             <MapList />
         {/if}
         {#if $warningMessageStore.length > 0}
             <WarningToast />
         {/if}
+
+        <MainModal />
     </section>
 
     {#if $layoutManagerActionVisibilityStore}

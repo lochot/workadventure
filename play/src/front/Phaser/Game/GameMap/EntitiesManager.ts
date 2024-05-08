@@ -1,16 +1,16 @@
 import {
     AreaDataProperties,
-    EntityDimensions,
     EntityData,
     EntityDataProperties,
+    EntityDimensions,
     EntityPrefabRef,
     WAMEntityData,
 } from "@workadventure/map-editor";
 import { Observable, Subject } from "rxjs";
-import { Unsubscriber, get } from "svelte/store";
+import { get, Unsubscriber } from "svelte/store";
 import { z } from "zod";
+import * as Sentry from "@sentry/svelte";
 import { actionsMenuStore } from "../../../Stores/ActionsMenuStore";
-import { gameSceneIsLoadedStore } from "../../../Stores/GameSceneStore";
 import {
     mapEditorEntityModeStore,
     mapEditorModeStore,
@@ -68,7 +68,6 @@ export class EntitiesManager extends Phaser.Events.EventEmitter {
 
     private properties: Map<string, string | boolean | number>;
     private actionsMenuStoreUnsubscriber: Unsubscriber;
-    private gameSceneIsLoadedStoreUnsubscriber: Unsubscriber;
 
     /**
      * Firing on map change, containing newest collision grid array
@@ -92,12 +91,15 @@ export class EntitiesManager extends Phaser.Events.EventEmitter {
             this.gameMapFrontWrapper.handleEntityActionTrigger();
         });
 
-        // When the gamescene is loaded (connection realy defined, etc.), we update all entities
-        this.gameSceneIsLoadedStoreUnsubscriber = gameSceneIsLoadedStore.subscribe((isLoaded) => {
-            if (isLoaded) {
+        // When the GameScene is loaded (connection established, etc.), we update all entities
+        this.scene.sceneReadyToStartPromise
+            .then(() => {
                 this.makeAllEntitiesInteractive(true);
-            }
-        });
+            })
+            .catch((e) => {
+                console.error(e);
+                Sentry.captureException(e);
+            });
 
         this.bindEventHandlers();
     }
@@ -147,10 +149,12 @@ export class EntitiesManager extends Phaser.Events.EventEmitter {
         }
 
         this.entities.set(entityId, entity);
+        this.scene.markDirty();
+
+        await this.scene.sceneReadyToStartPromise;
         if (entity.isActivatable()) {
             this.activatableEntities.push(entity);
         }
-        this.scene.markDirty();
         return entity;
     }
 
@@ -383,12 +387,8 @@ export class EntitiesManager extends Phaser.Events.EventEmitter {
         entity.on(Phaser.Input.Events.POINTER_OUT, () => {
             this.pointerOutEntitySubject.next(entity);
             if (get(mapEditorModeStore)) {
-                if (this.isEntityEditorToolActive()) {
+                if (this.isEntityEditorToolActive() || this.isExplorerToolActive()) {
                     entity.removePointedToEditColor();
-                    this.scene.markDirty();
-                }
-                if (this.isExplorerToolActive()) {
-                    entity.setPointedToEditColor(0x000000);
                     this.scene.markDirty();
                 }
             }
@@ -455,6 +455,30 @@ export class EntitiesManager extends Phaser.Events.EventEmitter {
         return this.entities;
     }
 
+    public getEntitiesInsideArea(areaId: string): Map<string, Entity> {
+        const entitiesInsideArea = new Map<string, Entity>();
+        const gameMapFrontWrapper = this.scene.getGameMapFrontWrapper();
+        const area = this.scene.getGameMap().getGameMapAreas()?.getArea(areaId);
+        if (area === undefined) {
+            return entitiesInsideArea;
+        }
+
+        this.entities.forEach((entity, entityId) => {
+            if (
+                gameMapFrontWrapper.isInsideAreaByCoordinates(
+                    { x: area.x, y: area.y, width: area.width, height: area.height },
+                    {
+                        x: entity.getBounds().centerX,
+                        y: entity.getBounds().centerY,
+                    }
+                )
+            ) {
+                entitiesInsideArea.set(entityId, entity);
+            }
+        });
+        return entitiesInsideArea;
+    }
+
     public getActivatableEntities(): Entity[] {
         return this.activatableEntities;
     }
@@ -473,16 +497,5 @@ export class EntitiesManager extends Phaser.Events.EventEmitter {
 
     public close() {
         this.actionsMenuStoreUnsubscriber();
-    }
-
-    public setAllEntitiesPointedToEditColor(color: number) {
-        for (const entity of this.entities.values()) {
-            entity.setPointedToEditColor(color);
-        }
-    }
-    public removeAllEntitiesPointedToEditColor() {
-        for (const entity of this.entities.values()) {
-            entity.removePointedToEditColor();
-        }
     }
 }
