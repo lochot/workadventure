@@ -1,6 +1,10 @@
 import { MathUtils } from "@workadventure/math-utils";
+import { get } from "svelte/store";
 import { isOutlineable } from "../../Utils/CustomTypeGuards";
 import type { Player } from "../Player/Player";
+import LL from "../../../i18n/i18n-svelte";
+import { isMediaBreakpointUp } from "../../Utils/BreakpointsUtils";
+import { RemotePlayer } from "../Entity/RemotePlayer";
 import type { ActivatableInterface } from "./ActivatableInterface";
 
 export class ActivatablesManager {
@@ -76,10 +80,21 @@ export class ActivatablesManager {
         }
         if (isOutlineable(this.selectedActivatableObjectByDistance)) {
             this.selectedActivatableObjectByDistance?.characterFarAwayOutline();
+            this.selectedActivatableObjectByDistance.destroyText("object");
         }
         this.selectedActivatableObjectByDistance = newNearestObject;
         if (isOutlineable(this.selectedActivatableObjectByDistance)) {
             this.selectedActivatableObjectByDistance?.characterCloseByOutline(this.outlineColor);
+            if (this.selectedActivatableObjectByDistance instanceof RemotePlayer == false) {
+                this.selectedActivatableObjectByDistance.playText(
+                    "object",
+                    isMediaBreakpointUp("md") ? get(LL).trigger.mobile.object() : get(LL).trigger.object(),
+                    10000,
+                    () => {
+                        this.currentPlayer.scene.userInputManager.handleActivableEntity();
+                    }
+                );
+            }
         }
     }
 
