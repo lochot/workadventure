@@ -870,7 +870,8 @@
                         id="mapEditorIcon"
                         class:border-top-light={$mapEditorModeStore && !isMobile}
                         name="toggle-map-editor"
-                        disabled={isMobile || !$mapManagerActivated}
+                        disabled={isMobile || !$mapManagerActivated} 
+                        style="display:none;" 
                     >
                         <img
                             draggable="false"
@@ -901,7 +902,7 @@
             </div>
 
 
-            {#if $roomListActivated}
+            {#if $roomListActivated && 1 === 0}
                 <div class="bottom-action-section tw-flex tw-flex-initial">
                     <!-- TODO button hep -->
                     <!-- Room list button -->
