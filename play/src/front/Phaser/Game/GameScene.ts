@@ -3659,8 +3659,8 @@ ${escapedMessage}
             0.3,
             1,
             () => {
-                mapEditorModeStore.switchMode(true);
-                this.mapEditorModeManager.equipTool(EditorToolName.ExploreTheRoom);
+                mapEditorModeStore.switchMode(false);
+                //this.mapEditorModeManager.equipTool(EditorToolName.ExploreTheRoom);
             },
             true,
             undefined,
